@@ -35,6 +35,15 @@ A jittery little pixel desktop pet that **does things on your computer** for you
 
 ## Using Opia
 
+The chat panel is laid out like a familiar chat app:
+- **Opia** is in the top-left corner, with what it's doing right now underneath.
+- **New chat**, **Settings**, **Hide** and **⏻ Turn off** are in the top right.
+- Before you've said anything, a greeting and some example tasks fill the panel.
+- Your messages appear in bubbles. Opia's replies have a **Copy** button underneath.
+- At the bottom is a rounded message box. Its Send button becomes **■ Stop** while Opia works; type something to queue it instead. The chip in the box shows where Opia browses; click it for Settings.
+- Light and dark themes follow your system setting.
+
+
 | Do this | What happens |
 |---|---|
 | Hover Opia and click **✦** (or press **Ctrl/Cmd+Shift+O**, or double-click Opia) | Opens the prompt panel |

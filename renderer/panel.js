@@ -43,6 +43,7 @@
       h = h.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
       h = h.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noreferrer">$2</a>');
       h = h.replace(/^#{1,6} (.+)$/gm, '<b>$1</b>');
+      h = h.replace(/^\s*[-*] (.+)$/gm, '• $1');
       h = h.replace(/\n/g, '<br>');
       return h;
     }).join('');
@@ -71,19 +72,35 @@
     currentAssistant = null;
   }
 
+  const COPY_ICON = '<svg viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 4 5v6A1.5 1.5 0 0 0 5.5 12.5H7"/></svg>';
+  function copyText(text, btn) {
+    const done = () => { btn.parentElement.classList.add('copied'); btn.lastChild.textContent = 'Copied'; setTimeout(() => { btn.parentElement.classList.remove('copied'); btn.lastChild.textContent = 'Copy'; }, 1500); };
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(done, () => {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (_) {} ta.remove();
+    });
+  }
+
   function appendAssistant(text, isDelta) {
     const stick = atBottom();
+    startChat();
     if (!currentAssistant) {
-      currentAssistant = { el: addMsg('assistant streaming', ''), text: '' };
+      const el = addMsg('assistant streaming', `<div class="body"></div><div class="actions"><button class="copy" title="Copy">${COPY_ICON}<span>Copy</span></button></div>`);
+      currentAssistant = { el, text: '' };
+      const holder = currentAssistant;
+      el.querySelector('.copy').addEventListener('click', (e) => copyText(holder.text, e.currentTarget));
       currentSteps = null; // steps after this message start a new group
     }
     currentAssistant.text = isDelta ? currentAssistant.text + text : text;
-    currentAssistant.el.innerHTML = md(currentAssistant.text);
+    currentAssistant.el.querySelector('.body').innerHTML = md(currentAssistant.text);
     if (!isDelta) endAssistantBubble();
     scrollDown(stick);
   }
 
+  function startChat() { document.body.classList.add('chatting'); }
+
   function addStep(name, summary) {
+    startChat();
     endAssistantBubble();
     if (!currentSteps) {
       currentSteps = addMsg('steps', '');
@@ -114,6 +131,7 @@
 
   function addPermissionCard(p) {
     if (document.querySelector(`.perm[data-id="${CSS.escape(p.id)}"]`)) return;
+    startChat();
     endAssistantBubble();
     const el = addMsg('perm', `
       <div class="perm-head">🧐 Opia would like to use <b>${escapeHtml(p.toolName || 'a tool')}</b></div>
@@ -142,9 +160,17 @@
     el.querySelector('.perm-actions').innerHTML = `<span class="verdict">${allow ? '✓ Allowed' : '✕ Denied'}</span>`;
   }
 
+  function syncButtons() {
+    const hasText = !!promptEl.value.trim();
+    stopBtn.hidden = !(busy && !hasText);
+    sendBtn.hidden = busy && !hasText;
+    sendBtn.disabled = !hasText;
+    sendBtn.title = busy ? 'Queue this after the current task (Enter)' : 'Send (Enter)';
+  }
+
   function setBusy(b) {
     busy = b;
-    stopBtn.hidden = !b;
+    syncButtons();
     document.body.classList.toggle('busy', b);
   }
 
@@ -228,6 +254,7 @@
     autosize();
     endAssistantBubble();
     finishSteps();
+    startChat();
     addMsg('user', md(text));
     scrollDown(true);
     setBusy(true);
@@ -242,13 +269,14 @@
 
   function autosize() {
     promptEl.style.height = 'auto';
-    promptEl.style.height = Math.min(promptEl.scrollHeight, 160) + 'px';
+    promptEl.style.height = Math.min(promptEl.scrollHeight, 180) + 'px';
+    syncButtons();
   }
 
   promptEl.addEventListener('input', autosize);
   promptEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
-    if (e.key === 'Escape') opia.hidePanel();
+    if (e.key === 'Escape') { if (!settingsEl.hidden) settingsEl.hidden = true; else opia.hidePanel(); }
   });
   sendBtn.addEventListener('click', () => send());
   async function stopNow() {
@@ -279,7 +307,9 @@
     await opia.newSession();
     endAssistantBubble();
     finishSteps();
-    log.querySelectorAll('.msg:not(.system)').forEach((m) => m.remove());
+    log.querySelectorAll('.msg').forEach((m) => m.remove());
+    document.body.classList.remove('chatting');
+    setGreeting();
     addMsg('meta', 'new chat — Opia forgot the previous conversation');
     promptEl.focus();
   });
@@ -295,6 +325,30 @@
       if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k] == null ? '' : s[k];
       if (k === 'browserMode' && !el.dataset.watch) { el.dataset.watch = '1'; el.addEventListener('change', async () => { await opia.setSettings({ browserMode: el.value }); refreshExtension({ card: true }); }); }
     }
+  }
+
+  $('btn-settings-close').addEventListener('click', () => { settingsEl.hidden = true; });
+  $('mode-chip').addEventListener('click', () => { settingsEl.hidden = false; loadSettings(); refreshExtension(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsEl.hidden && document.activeElement !== promptEl) settingsEl.hidden = true; });
+
+  // Greeting by time of day, and the composer chip showing where Opia browses.
+  function setGreeting() {
+    const h = new Date().getHours();
+    const part = h < 5 ? 'tonight' : h < 12 ? 'this morning' : h < 18 ? 'this afternoon' : 'this evening';
+    $('hero-greeting').textContent = `What can I do for you ${part}?`;
+  }
+  const MODE_LABEL = { link: 'All my tabs', mine: 'Picked tabs', separate: 'Own browser' };
+  async function refreshModeChip() {
+    let st, ln;
+    try { st = await opia.getSettings(); } catch (_) { return; }
+    const chip = $('mode-chip');
+    chip.classList.remove('ok', 'warn');
+    let label = MODE_LABEL[st.browserMode] || 'Browser';
+    if (st.browserMode === 'link') {
+      try { ln = await opia.linkStatus(); } catch (_) { ln = null; }
+      if (ln && ln.connected) { chip.classList.add('ok'); label += ` · ${ln.tabs}`; } else { chip.classList.add('warn'); label = 'Opia Link: not connected'; }
+    } else if (st.browserMode === 'separate') chip.classList.add('ok');
+    $('mode-label').textContent = label;
   }
 
   $('btn-settings').addEventListener('click', () => {
@@ -355,6 +409,7 @@
   $('btn-link-connect').addEventListener('click', async () => showLinkSteps(await opia.connectLink()));
 
   async function refreshExtension({ card = false } = {}) {
+    refreshModeChip();
     let ext, st;
     try { st = await opia.getSettings(); } catch (_) { return; }
     $('btn-link-connect').hidden = true;
@@ -441,6 +496,8 @@
   // ------------------------------------------------------------ init
 
   window.addEventListener('focus', () => promptEl.focus());
+  setGreeting();
+  syncButtons();
   checkClaude();
   refreshExtension({ card: true });
   window.addEventListener('focus', () => { if (extCard) refreshExtension(); });

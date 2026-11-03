@@ -15,8 +15,8 @@ const { createPhysics } = require('./physics');
 const { createUpdater } = require('./updater');
 
 const PET_SIZE = 200;
-const PANEL_W = 400;
-const PANEL_H = 600;
+const PANEL_W = 440;
+const PANEL_H = 660;
 const ASSETS = path.join(__dirname, '..', 'assets');
 const RENDERER = path.join(__dirname, '..', 'renderer');
 
