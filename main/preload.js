@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('opia', {
   // extras (panel)
   hidePanel: () => ipcRenderer.send('panel:hide'),
   getState: () => ipcRenderer.invoke('app:state'),
+  linkStatus: () => ipcRenderer.invoke('link:status'),
+  connectLink: () => ipcRenderer.invoke('link:connect'),
   checkExtension: () => ipcRenderer.invoke('browser:extension'),
   installExtension: () => ipcRenderer.invoke('browser:installExtension'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),

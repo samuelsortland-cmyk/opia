@@ -42,15 +42,17 @@
     <label class="row">
       <span>Where Opia browses</span>
       <select id="set-browserMode">
-        <option value="mine">My browser: works in my own Edge/Chrome tab</option>
+        <option value="link">My browser, all tabs (Opia Link)</option>
+        <option value="mine">My browser, picked tabs (Playwright Extension)</option>
         <option value="separate">Opia's own invisible browser (no setup)</option>
       </select>
     </label>
     <div class="row ext-row">
       <span id="ext-status">Checking for the Playwright Extension…</span>
       <button id="btn-ext-install" type="button">Install in Edge</button>
+      <button id="btn-link-connect" type="button" hidden>Connect my Edge</button>
     </div>
-    <p class="hint"><b>My browser</b> needs the free Playwright Extension in Edge (one time): click <b>Install in Edge</b>, then <b>Get</b>. If Edge asks, choose <b>Allow extensions from other stores</b>. When a task starts, Edge asks which tab Opia may use. Paste the extension's token below to skip that question. <b>Opia's own invisible browser</b> needs no setup, but its results don't appear in your tabs.</p>
+    <p class="hint"><b>All tabs (Opia Link)</b>: Opia's own extension, so Opia can work in every tab you have open, with no tab picking. Set it up once with <b>Connect my Edge</b>. <b>Picked tabs</b>: the store's Playwright Extension; Opia only sees tabs you put in its group. <b>Invisible browser</b>: no setup, but results don't appear in your tabs. In every mode, Opia never makes payments.</p>
     <label class="row">
       <span>Extension token (optional)</span>
       <input type="password" id="set-extensionToken" spellcheck="false" placeholder="PLAYWRIGHT_MCP_EXTENSION_TOKEN">
@@ -132,7 +134,7 @@
   <main id="log" aria-live="polite">
     <div class="msg system">
       Hi! I'm <b>Opia 5.5</b>, at your service 🎩🧐 Ask me to do something on your computer or the web.
-      I work right inside your own Edge tabs, reading and clicking in the page without touching your mouse or keyboard, so you can keep playing or working while I work.
+      I work right inside your own Edge tabs, reading and clicking in the page without touching your mouse or keyboard, so you can keep playing or working while I work. I never make payments.
       <div class="examples">
         <button class="example">Find the 3 top stories on Hacker News and summarize them</button>
         <button class="example">What's taking up the most space in my Downloads folder?</button>

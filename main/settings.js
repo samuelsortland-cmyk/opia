@@ -12,7 +12,7 @@ const DEFAULTS = Object.freeze({
   model: '',
   browser: '', // '' = auto-detect installed Edge/Chrome/Brave/Chromium (Edge first) | 'chrome' | 'msedge' | 'chromium' | 'firefox'
   browserPath: '', // optional explicit browser executable; overrides `browser`
-  browserMode: 'mine', // 'mine' = a tab in your own Edge/Chrome (needs the Playwright Extension) | 'separate' = Opia's own invisible browser
+  browserMode: 'link', // 'link' = every tab of your own Edge/Chrome via Opia Link | 'mine' = Playwright Extension (tab group) | 'separate' = Opia's own invisible browser
   extensionToken: '', // PLAYWRIGHT_MCP_EXTENSION_TOKEN from the Playwright Extension (skips the connect dialog)
   browserProfile: '', // optional Chrome profile dir name for extension mode, e.g. "Profile 1"
   quiet: true, // never take keyboard focus on its own (safe while gaming)
@@ -22,7 +22,7 @@ const DEFAULTS = Object.freeze({
   updateBranch: 'main',
   updatePath: '', // folder inside the repo that holds Opia ('' = the repo root)
   updateToken: '', // optional read-only GitHub token, needed only if the repo is private
-  settingsVersion: 2,
+  settingsVersion: 3,
 });
 
 class Settings {
@@ -33,9 +33,10 @@ class Settings {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       this.data = { ...DEFAULTS, ...sanitize(raw) };
       // v2: Opia works in your own browser tab by default (was: its own invisible browser).
-      if (!(raw.settingsVersion >= 2)) {
-        this.data.browserMode = 'mine';
-        this.data.settingsVersion = 2;
+      // v3: Opia Link (all your tabs, Opia's own extension) is the default way to use your browser.
+      if (!(raw.settingsVersion >= 3)) {
+        this.data.browserMode = 'link';
+        this.data.settingsVersion = 3;
       }
       // Opia moved from the claude-team repo to its own repo: follow it.
       if (this.data.updateRepo === 'samuelsortland-cmyk/claude-team') {
@@ -69,7 +70,7 @@ function sanitize(obj) {
   if (typeof obj.model === 'string') out.model = obj.model.trim();
   if (['', 'chrome', 'msedge', 'chromium', 'firefox'].includes(obj.browser)) out.browser = obj.browser;
   if (typeof obj.browserPath === 'string') out.browserPath = obj.browserPath.trim();
-  if (['mine', 'separate'].includes(obj.browserMode)) out.browserMode = obj.browserMode;
+  if (['link', 'mine', 'separate'].includes(obj.browserMode)) out.browserMode = obj.browserMode;
   if (typeof obj.extensionToken === 'string') out.extensionToken = obj.extensionToken.trim();
   if (typeof obj.browserProfile === 'string') out.browserProfile = obj.browserProfile.trim();
   if (typeof obj.quiet === 'boolean') out.quiet = obj.quiet;

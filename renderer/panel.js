@@ -198,6 +198,12 @@
       case 'update':
         showUpdate(ev);
         break;
+      case 'link':
+        refreshExtension();
+        break;
+      case 'link-blocked':
+        addMsg('meta', `🎩 Blocked a payment step (${escapeHtml(ev.reason || 'payment')}). I never make payments.`);
+        break;
       default:
         break;
     }
@@ -273,6 +279,7 @@
     for (const k of FIELDS) {
       const el = $('set-' + k);
       if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k] == null ? '' : s[k];
+      if (k === 'browserMode' && !el.dataset.watch) { el.dataset.watch = '1'; el.addEventListener('change', async () => { await opia.setSettings({ browserMode: el.value }); refreshExtension({ card: true }); }); }
     }
   }
 
@@ -299,9 +306,52 @@
 
   const BROWSER_NAME = { msedge: 'Edge', chrome: 'Chrome' };
   let extCard = null;
+  let linkCard = null;
+  function showLinkSteps(res) {
+    const where = res && res.browser ? res.browser : 'Edge';
+    addMsg('meta setup-card', `I opened ${where}'s Extensions page and the Opia Link folder (its path is copied). In ${where}:
+      <ol class="steps">
+        <li>Turn on <b>Developer mode</b> (a switch on the Extensions page).</li>
+        <li>Click <b>Load unpacked</b>.</li>
+        <li>Paste the path (<b>Ctrl+V</b>) into the folder box, or pick the <b>opia-link</b> folder, then click <b>Select Folder</b>.</li>
+      </ol>I'll say "Opia Link connected!" when it works.${res && res.dir ? `<div class="path">${escapeHtml(res.dir)}</div>` : ''}`);
+  }
+  async function refreshLink({ card = false } = {}) {
+    let st;
+    try { st = await opia.linkStatus(); } catch (_) { return; }
+    $('ext-status').textContent = st.connected ? `✓ Opia Link connected (${st.tabs} tab${st.tabs === 1 ? '' : 's'})` : '✗ Opia Link not connected yet';
+    $('btn-ext-install').hidden = true;
+    $('btn-link-connect').hidden = !!st.connected;
+    $('btn-link-connect').textContent = 'Connect my Edge';
+    if (st.connected && linkCard) { linkCard.remove(); linkCard = null; addMsg('meta', '✓ Opia Link connected! I can work in all your tabs now.'); }
+    if (card && !st.connected && !linkCard) {
+      linkCard = addMsg('meta setup-card', `🧐 To work in <b>all your Edge tabs</b>, connect Opia Link, my little browser extension (one-time, about 30 seconds).
+        <div class="setup-actions">
+          <button class="link-connect">Connect my Edge</button>
+          <button class="ext-separate">Use my own invisible browser instead</button>
+        </div>`);
+      linkCard.querySelector('.link-connect').addEventListener('click', async () => showLinkSteps(await opia.connectLink()));
+      linkCard.querySelector('.ext-separate').addEventListener('click', async () => {
+        await opia.setSettings({ browserMode: 'separate' });
+        linkCard.remove(); linkCard = null;
+        addMsg('meta', 'OK, I\'ll browse in my own invisible browser. Change it any time in Settings.');
+      });
+    }
+  }
+  $('btn-link-connect').addEventListener('click', async () => showLinkSteps(await opia.connectLink()));
+
   async function refreshExtension({ card = false } = {}) {
     let ext, st;
-    try { [ext, st] = await Promise.all([opia.checkExtension(), opia.getSettings()]); } catch (_) { return; }
+    try { st = await opia.getSettings(); } catch (_) { return; }
+    $('btn-link-connect').hidden = true;
+    if (st.browserMode === 'link') return refreshLink({ card });
+    if (linkCard) { linkCard.remove(); linkCard = null; }
+    if (st.browserMode === 'separate') {
+      $('ext-status').textContent = 'Opia uses its own invisible browser.';
+      $('btn-ext-install').hidden = true;
+      return;
+    }
+    try { ext = await opia.checkExtension(); } catch (_) { return; }
     const where = ext.installed ? `${BROWSER_NAME[ext.browser] || ext.browser}${ext.profile && ext.profile !== 'Default' ? ' (' + ext.profile + ')' : ''}` : '';
     $('ext-status').textContent = ext.installed ? `✓ Playwright Extension found in ${where}` : '✗ Playwright Extension not installed yet';
     $('btn-ext-install').hidden = !!ext.installed;

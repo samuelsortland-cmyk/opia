@@ -1,8 +1,8 @@
 {
   "name": "opia",
   "productName": "Opia 5.5",
-  "version": "5.5.4",
-  "description": "Opia 5.5 \u2014 a jittery pixel desktop pet that does things on your computer with Claude Code.",
+  "version": "5.6.0",
+  "description": "Opia 5.5 — a jittery pixel desktop pet that does things on your computer with Claude Code.",
   "main": "main/main.js",
   "private": true,
   "license": "MIT",
@@ -13,7 +13,8 @@
     "dist": "electron-builder"
   },
   "dependencies": {
-    "@playwright/mcp": "^0.0.84"
+    "@playwright/mcp": "^0.0.84",
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "electron": "^33.0.0"
@@ -25,6 +26,7 @@
       "main/**",
       "renderer/**",
       "assets/**",
+      "extension/**",
       "package.json"
     ],
     "mac": {

@@ -5,8 +5,10 @@
 const path = require('path');
 const {
   app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage,
-  globalShortcut, Notification, shell, desktopCapturer, systemPreferences,
+  globalShortcut, Notification, shell, desktopCapturer, systemPreferences, clipboard,
 } = require('electron');
+const { spawn } = require('child_process');
+const { LinkServer } = require('./link');
 const { Settings } = require('./settings');
 const { createPhysics } = require('./physics');
 const { createUpdater } = require('./updater');
@@ -39,6 +41,7 @@ let wanderSnoozed = false;
 const dragFollow = false; // panel stays put when the pet wanders
 
 let physics = null;
+let link = null; // Opia Link: the bridge to the user's own browser
 let updater = null;
 
 const queue = [];               // prompts waiting while the agent is busy
@@ -300,6 +303,7 @@ function loadAgent() {
     userDataDir: app.getPath('userData'),
     getSettings: () => settings.get(),
     captureScreen,
+    getLinkEndpoint: () => (link ? link.cdpEndpoint() : null),
     onPermissionRequest: (req) => new Promise((resolve) => {
       pendingPerms.set(req.id, { resolve, ...req });
       if (!panelVisible()) {
@@ -410,6 +414,21 @@ function registerIpc() {
   ipcMain.handle('claude:check', async () => {
     try { return await checkClaudeFn(settings.get()); } catch (err) { return { installed: false, error: err.message }; }
   });
+  ipcMain.handle('link:status', () => (link ? link.status() : { connected: false, error: 'Opia Link is not running' }));
+  ipcMain.handle('link:connect', () => {
+    if (!link) return { ok: false, error: 'Opia Link is not running' };
+    const dir = link.prepareExtension();
+    try { clipboard.writeText(dir); } catch (_) {}
+    shell.openPath(dir).catch(() => {});
+    // Open the browser's Extensions page (Edge first, as Opia's default browser).
+    let browserPath = '';
+    try { browserPath = require('./agent').findInstalledBrowser(); } catch (_) {}
+    const page = /edge/i.test(browserPath) ? 'edge://extensions/' : 'chrome://extensions/';
+    if (browserPath) {
+      try { spawn(browserPath, [page], { detached: true, stdio: 'ignore', windowsHide: false }).unref(); } catch (_) {}
+    }
+    return { ok: true, dir, page, browser: /edge/i.test(browserPath) ? 'Edge' : browserPath ? 'Chrome' : '' };
+  });
   ipcMain.handle('browser:extension', () => {
     try { return require('./agent').findExtension(); } catch (err) { return { installed: false, error: err.message }; }
   });
@@ -440,6 +459,16 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
   registerIpc();
   loadAgent();
+  link = new LinkServer({ dataDir: app.getPath('userData'), extensionSrc: path.join(__dirname, '..', 'extension') });
+  link.start().catch((err) => console.error('[opia] Opia Link:', err.message));
+  link.on('status', (st) => {
+    broadcast({ type: 'link', ...st });
+    if (st.connected) sendToPet({ type: 'status', mood: 'success', text: 'Opia Link connected! I can reach your tabs now 🎩' });
+  });
+  link.on('blocked', (b) => {
+    broadcast({ type: 'link-blocked', ...b });
+    sendToPet({ type: 'status', mood: 'error', text: 'No payments! I don\'t do those 🎩' });
+  });
   physics = createPhysics({
     getWindow: () => petWin,
     getWorkArea: (b) => workAreaFor(b),
@@ -481,6 +510,7 @@ app.on('window-all-closed', (e) => { if (!quitting) e.preventDefault(); });
 app.on('before-quit', () => {
   quitting = true;
   if (physics) physics.stop('quit');
+  try { if (link) link.stop(); } catch (_) {}
   for (const p of pendingPerms.values()) p.resolve({ allow: false, message: 'Opia is quitting' });
   pendingPerms.clear();
   try { if (agent && typeof agent.dispose === 'function') agent.dispose(); else if (agent) agent.cancel(); } catch (_) {}

@@ -17,7 +17,7 @@ A jittery little pixel desktop pet that **does things on your computer** for you
   claude
   ```
   Run `claude` once in a terminal, finish the login, then exit.
-- **Microsoft Edge or Google Chrome** with the free [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm), so Opia can work in your own tabs. Opia's panel has an **Install in Edge** button. Prefer no extension? Choose *Opia's own invisible browser* in Settings, which finds Edge, Chrome, Brave or Chromium by itself. If you have none, run `npx playwright install chromium` in Opia's folder after `npm install`.
+- **Microsoft Edge or Google Chrome** (version 125 or later). Opia works in your tabs through Opia Link, its own extension, which you add once with **Connect my Edge**. Prefer no extension? Choose *Opia's own invisible browser* in Settings. If you have none, run `npx playwright install chromium` in Opia's folder after `npm install`.
 
 ## Install & run
 
@@ -62,36 +62,36 @@ Example tasks:
 
 Opia's animation follows what the agent is doing: **thinking** (tapping, looking up), **browsing** (the monocle glints as Opia peers at pages), **working**, **listening** (waiting for your OK), **success** (tips its hat and hops), **error** (shakes), and **sleeping** (Zzz, after being ignored for a while).
 
-## Working in your browser
+## Working in your browser (Opia Link)
 
-By default, Opia works **in your own Edge (or Chrome) tabs**, with your normal logins, so its results show up right in your browser. For example, it can fill in a quiz in the tab you have open.
+By default, Opia works in **all your open Edge (or Chrome) tabs** through **Opia Link**, its own small browser extension. Your tabs keep their normal logins. Opia can find "my quiz tab" even when it's in the background, and fill it in right there, with no tab picking.
 
-**One-time setup (about a minute):**
-1. In Opia's panel, click **Install in Edge**. It opens the Playwright Extension's store page in Edge.
-2. If Edge shows a bar about other stores, click **Allow extensions from other stores**. Then click **Get** → **Add extension**.
-3. Click **I installed it** in Opia's panel. Settings will show "✓ Playwright Extension found in Edge".
-4. Optional: open the extension (puzzle-piece icon in Edge) and copy its `PLAYWRIGHT_MCP_EXTENSION_TOKEN`. Paste it into **Settings → Extension token**, and Opia connects without asking which tab each time.
+**One-time setup (about 30 seconds):**
+1. In Opia's panel, click **Connect my Edge**. Opia opens Edge's Extensions page and the Opia Link folder, and copies the folder's path.
+2. In Edge, turn on **Developer mode** (a switch on the Extensions page).
+3. Click **Load unpacked**, paste the path (**Ctrl+V**) or pick the `opia-link` folder, then click **Select Folder**.
+4. Opia says **"Opia Link connected!"**. Keep Edge open, and you're done. Opia Link reconnects by itself whenever Opia and Edge are both running.
 
-**Using it:** keep Edge open. When a task needs the web, Edge shows a small page asking which tab Opia may use; pick the one you mean. Opia then works inside that tab.
+**How it stays out of your way:**
+- Opia's clicks and typing go **into the page**, never through your real mouse or keyboard.
+- Opia never brings Edge to the front or switches the tab you're looking at. Tabs it opens (only when you ask) open in the background.
+- It attaches to your tabs only while it's working on a task. While it's working, Edge shows a "started debugging this browser" bar, which goes away when the task ends.
+- Opia Link only talks to Opia on your own computer (`127.0.0.1`). Both sides prove they share a secret that Opia generated, so web pages can't use it.
+- When Opia updates, it refreshes Opia Link's files and the extension reloads itself.
 
-**Which tabs Opia can reach:** for safety, the extension only shows Opia the tabs in **its own tab group** in Edge (a colored group label in the tab strip). That group holds the tab you picked, plus any tabs Opia opens.
-- To give Opia more tabs, **drag them into its group**.
-- To take a tab away, drag it out.
-- There's no "all tabs" switch; the extension is designed this way on purpose.
+### No payments, ever
+Opia never makes payments or purchases, even if you ask. This is enforced in three places:
+1. **Opia's instructions:** it refuses buying, ordering, checking out, paid subscriptions, donating, sending money, and entering card or bank details.
+2. **Payment sites are refused:** Opia won't open PayPal, Stripe checkout, Klarna, Afterpay, Venmo, Cash App, Robux purchase pages and similar.
+3. **The in-page guard:** while Opia is working in a tab, Opia Link locks card and bank fields, payment frames, payment pages, and pay / buy / place order / checkout buttons (and "subscribe"-style buttons when a price is shown). You'll see "🎩 Blocked by Opia" on the page.
 
-**Why it won't get in your way:**
-- Opia's clicks and typing go into the page itself, never through your real mouse or keyboard.
-- **Quiet mode** (on by default) sends notifications instead of popping windows over your game.
+When Opia lets go of the tab, everything works normally for you again. Note: while Opia is working, these payment controls are locked for you too in the tabs it's using.
 
-**Things to know:**
-- Edge shows a "started debugging this browser" bar while Opia is connected.
-- The tab-picker page opens when a task starts. With the token saved, it connects without asking.
-- Without the extension, Opia has no browser for that task and tells you how to install it, instead of hanging.
+This is a strong guard but not a perfect one: an unusual payment flow it doesn't recognize could slip through. Don't leave one-click purchasing set up anywhere you'd hate a surprise.
 
-### Alternative: Opia's own invisible browser
-Choose **Settings → Where Opia browses → Opia's own invisible browser** to skip the extension.
-- Opia then uses a separate, hidden Edge/Chrome profile. Its logins are separate from yours: to sign in once, untick **Hide Opia's browser**.
-- What it does there doesn't appear in your tabs.
+### Other options (Settings → Where Opia browses)
+- **My browser, picked tabs (Playwright Extension):** uses the store's [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) instead of Developer mode. Opia only sees the tabs in its own tab group (drag tabs in to share them), and Edge comes to the front when it connects.
+- **Opia's own invisible browser:** no setup. Opia uses a separate, hidden Edge/Chrome profile, so results don't appear in your tabs. Untick **Hide Opia's browser** to sign in to sites there once.
 
 ## Seeing your screen
 
@@ -115,7 +115,7 @@ Opia can update itself from GitHub.
 
 ## Safety model
 
-- **Only the tab you share.** In *My browser* mode, Opia works only in the tab you pick when it connects. It can see whatever that site shows you while logged in, and it treats page content as untrusted. Disconnect any time from the extension. For full isolation, use *Opia's own invisible browser*, which has its own profile and can't see your tabs, cookies or logins.
+- **Your tabs, no payments.** With Opia Link, Opia can work in any tab you have open, only while it's on a task you gave it, and never makes payments (see above). In *picked tabs* mode it works only in the tabs you share with it. It can see whatever that site shows you while logged in, and it treats page content as untrusted. Disconnect any time from the extension. For full isolation, use *Opia's own invisible browser*, which has its own profile and can't see your tabs, cookies or logins.
 - **Permission cards.** In **Ask** mode (default), browsing and read-only tools run freely. Anything that runs a shell command or changes files shows an **Allow / Deny** card with the exact command or file first. If the panel is hidden, you get a notification (with Quiet mode off, the panel also appears, without taking focus). Unanswered requests are denied after a timeout.
 - **Auto mode** (Settings → Permissions) approves everything. Only use it when you trust the task.
 - Opia is told to stop and ask before purchases, sending messages or email, entering credentials, or deleting things, and to treat web page content as untrusted (prompt injection).
@@ -126,7 +126,7 @@ Opia can update itself from GitHub.
 | Setting | Meaning |
 |---|---|
 | Permissions | `Ask` (default) or `Auto` |
-| Where Opia browses | **My browser** (default: your own Edge/Chrome tabs; needs the Playwright Extension) or **Opia's own invisible browser** (no setup) |
+| Where Opia browses | **My browser, all tabs (Opia Link)** (default; one-time Connect my Edge), **picked tabs** (Playwright Extension), or **Opia's own invisible browser** (no setup) |
 | Extension token | *My browser* mode only: optional `PLAYWRIGHT_MCP_EXTENSION_TOKEN` to skip the tab-connect dialog |
 | Chrome profile | *My browser* mode only: optional profile folder name (e.g. `Profile 1`) |
 | Quiet mode | On by default: never pop up over other apps; notify instead |
@@ -159,6 +159,8 @@ opia/
   main/agent.js        Claude Code CLI wrapper (stream-json, --resume, MCP config)
   main/physics.js      fling physics: gravity, bounces, friction
   main/updater.js      self-updater from GitHub
+  main/link.js         Opia Link relay: the extension <-> Playwright MCP bridge, payment-site block
+extension/             Opia Link browser extension (all tabs via chrome.debugger) + payment guard
   main/tools/          MCP bridge (approve + see_screen), helpers
   renderer/index.html  pet window (canvas + speech bubble + ✦ button)
   renderer/app.js      wires agent events → moods, drag/click, click-through
