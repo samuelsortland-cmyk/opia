@@ -128,7 +128,7 @@ button.icon:hover { background: var(--bg-3); color: var(--text); border-color: v
 .row.check { grid-template-columns: auto 1fr; color: var(--text); }
 .row.buttons { grid-template-columns: 1fr auto; }
 #settings-saved { color: var(--ok); font-size: 12px; }
-.row input[type="text"], .row select {
+.row input[type="text"], .row input[type="password"], .row select {
   width: 100%;
   background: var(--bg);
   color: var(--text);
@@ -138,7 +138,7 @@ button.icon:hover { background: var(--bg-3); color: var(--text); border-color: v
   font: inherit;
   outline: none;
 }
-.row input[type="text"]:focus, .row select:focus { border-color: var(--accent); }
+.row input[type="text"]:focus, .row input[type="password"]:focus, .row select:focus { border-color: var(--accent); }
 .row input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
 #btn-settings-save, #btn-recheck { background: var(--accent); border-color: var(--accent); color: #1b1110; font-weight: 600; }
 .hint { color: var(--muted); font-size: 11.5px; margin: 8px 0 0; }
