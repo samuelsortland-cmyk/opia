@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('opia', {
 
   // extras (panel)
   hidePanel: () => ipcRenderer.send('panel:hide'),
+  turnOff: () => ipcRenderer.send('app:quit'),
+  petMenu: () => ipcRenderer.send('pet:menu'),
   getState: () => ipcRenderer.invoke('app:state'),
   createShortcuts: () => ipcRenderer.invoke('app:shortcuts'),
   linkStatus: () => ipcRenderer.invoke('link:status'),

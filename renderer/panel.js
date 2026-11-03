@@ -271,6 +271,10 @@
   });
 
   $('btn-close').addEventListener('click', () => opia.hidePanel());
+  $('btn-quit').addEventListener('click', () => {
+    if (busy && !confirm('Opia is working on a task. Stop it and turn Opia off?')) return;
+    opia.turnOff();
+  });
   $('btn-new').addEventListener('click', async () => {
     await opia.newSession();
     endAssistantBubble();

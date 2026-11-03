@@ -37,7 +37,9 @@ A jittery little pixel desktop pet that **does things on your computer** for you
 
 | Do this | What happens |
 |---|---|
-| Hover Opia and click **✦** (or press **Ctrl/Cmd+Shift+O**, double-click, or right-click Opia) | Opens the prompt panel |
+| Hover Opia and click **✦** (or press **Ctrl/Cmd+Shift+O**, or double-click Opia) | Opens the prompt panel |
+| **Right-click Opia** | A menu: Open Opia, Stop current task, Snooze wandering, Hide Opia, **Turn off Opia** |
+| **⏻** in the panel's title bar (or tray → Turn off Opia) | Turns Opia off completely (stops any running task first) |
 | Type a task and press **Enter** | Opia thinks, browses, and works; progress shows in the panel and in Opia's speech bubble |
 | Close the panel (✕ or Esc) | **Opia keeps working in the background.** You get a notification when it's done or needs approval |
 | Send another task while busy | It is queued and runs next |

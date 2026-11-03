@@ -229,7 +229,11 @@
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 
   canvas.addEventListener('dblclick', () => bridge.togglePanel());
-  canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); bridge.togglePanel(); });
+  // Right-click Opia: a small menu (open, stop, snooze, hide, turn off).
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (typeof bridge.petMenu === 'function') bridge.petMenu(); else bridge.togglePanel();
+  });
 
   // Petting: slow hovering strokes over Opia count as pets.
   let strokeDist = 0;

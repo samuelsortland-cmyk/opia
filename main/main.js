@@ -296,7 +296,7 @@ function rebuildTrayMenu() {
       ? { label: 'Update Opia now', click: () => updater.apply() }
       : { label: 'Check for updates', click: () => updater && updater.check(), enabled: !!updater },
     { type: 'separator' },
-    { label: 'Quit', click: () => { quitting = true; app.quit(); } },
+    { label: 'Turn off Opia', click: () => turnOff() },
   ]));
 }
 
@@ -339,6 +339,13 @@ function loadAgent() {
       rebuildTrayMenu();
     }
   });
+}
+
+/** Turn Opia off completely: stop any task (killing Claude Code and its tools), then quit. */
+function turnOff() {
+  if (agent && agent.busy) stopTask();
+  quitting = true;
+  app.quit();
 }
 
 /** Stop now: drop queued prompts, deny pending approvals, kill the running task. */
@@ -409,6 +416,21 @@ function registerIpc() {
 
   ipcMain.on('panel:toggle', togglePanel);
   ipcMain.on('panel:hide', hidePanel);
+  ipcMain.on('app:quit', () => turnOff());
+  ipcMain.on('pet:menu', () => {
+    if (!petWin || petWin.isDestroyed()) return;
+    Menu.buildFromTemplate([
+      { label: 'Open Opia', click: () => showPanel() },
+      { label: 'Stop current task', click: () => stopTask(), enabled: !!(agent && agent.busy) },
+      {
+        label: 'Snooze wandering', type: 'checkbox', checked: wanderSnoozed,
+        click: (item) => { wanderSnoozed = item.checked; broadcast({ type: 'wander', paused: wanderSnoozed }); rebuildTrayMenu(); },
+      },
+      { label: 'Hide Opia (tray icon brings it back)', click: () => togglePet() },
+      { type: 'separator' },
+      { label: 'Turn off Opia', click: () => turnOff() },
+    ]).popup({ window: petWin });
+  });
 
   ipcMain.handle('agent:prompt', (_e, text) => enqueuePrompt(text));
   ipcMain.handle('agent:cancel', () => stopTask());

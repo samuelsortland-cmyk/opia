@@ -1,7 +1,7 @@
 {
   "name": "opia",
   "productName": "Opia 5.5",
-  "version": "5.7.0",
+  "version": "5.7.1",
   "description": "Opia 5.5 — a jittery pixel desktop pet that does things on your computer with Claude Code.",
   "main": "main/main.js",
   "private": true,
