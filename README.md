@@ -74,6 +74,11 @@ By default, Opia works **in your own Edge (or Chrome) tabs**, with your normal l
 
 **Using it:** keep Edge open. When a task needs the web, Edge shows a small page asking which tab Opia may use; pick the one you mean. Opia then works inside that tab.
 
+**Which tabs Opia can reach:** for safety, the extension only shows Opia the tabs in **its own tab group** in Edge (a colored group label in the tab strip). That group holds the tab you picked, plus any tabs Opia opens.
+- To give Opia more tabs, **drag them into its group**.
+- To take a tab away, drag it out.
+- There's no "all tabs" switch; the extension is designed this way on purpose.
+
 **Why it won't get in your way:**
 - Opia's clicks and typing go into the page itself, never through your real mouse or keyboard.
 - **Quiet mode** (on by default) sends notifications instead of popping windows over your game.

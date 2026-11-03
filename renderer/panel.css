@@ -110,6 +110,12 @@ button.icon:hover { background: var(--bg-3); color: var(--text); border-color: v
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
   background: var(--bg-2);
+  /* The panel is a fixed-height flex column: let these shrink and scroll instead of overflowing. */
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 78vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 #setup { background: linear-gradient(180deg, rgba(216, 117, 86, .12), var(--bg-2)); }
 #setup h3, #settings h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent-2); }

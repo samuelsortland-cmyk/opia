@@ -394,6 +394,9 @@ class OpiaAgent extends EventEmitter {
       if (profile) pwArgs.push('--profile-dir-name', profile);
       // The token (shown in the extension's UI) skips the per-connection approval dialog.
       if (s.extensionToken) pwEnv.PLAYWRIGHT_MCP_EXTENSION_TOKEN = s.extensionToken;
+      // Keep Edge behind the user's current app when connecting (supported by newer Playwright MCP
+      // releases and extension 0.5+; ignored by older ones).
+      pwEnv.PLAYWRIGHT_MCP_BACKGROUND = '1';
     } else {
       pwArgs = ['--user-data-dir', profile];
       if (s.browserHeadless) pwArgs.push('--headless');
