@@ -37,7 +37,7 @@
   .url span { flex: 1; background: #f1f3f4; border-radius: 14px; padding: 5px 12px; font-size: 11px; color: #333; }
   .dbg { background: #fff8d6; color: #5c4a00; font-size: 10.5px; padding: 5px 10px; border-bottom: 1px solid #eedc8a; }
   .page { position: relative; height: calc(100% - 92px); overflow: hidden; }
-  .pg { position: absolute; inset: 0; padding: 16px 18px; color: #1d1d1f; opacity: 0; transition: opacity .3s; }
+  .pg { position: absolute; inset: 0; padding: 16px 18px; color: #1d1d1f; opacity: 0; } /* instant switches: hard cuts */
   .pg.on { opacity: 1; }
   .pg h1 { font-size: 20px; margin: 0 0 4px; }
   .sub { color: #666; font-size: 11.5px; margin-bottom: 10px; }
@@ -54,6 +54,14 @@
   .cart i { width: 46px; height: 46px; border-radius: 8px; background: linear-gradient(135deg, #222, #555); }
   .field { border: 1.5px solid #ccd; border-radius: 9px; padding: 9px 11px; font-size: 12px; color: #999; margin: 6px 0 12px; }
   .buy { background: #f0a020; color: #111; }
+  .rej { opacity: 0; transform: translateX(-30px); transition: all .25s cubic-bezier(.2,1.3,.4,1); }
+  .rej.on { opacity: 1; transform: none; }
+  .fl { font-size: 11.5px; font-weight: 700; margin: 8px 0 3px; }
+  .in { border: 1.5px solid #ccd; border-radius: 8px; padding: 7px 10px; font-size: 12px; min-height: 30px; color: #111; transition: border-color .2s; }
+  .in.act { border-color: #d97757; box-shadow: 0 0 0 3px #d9775733; }
+  .in.big { min-height: 58px; line-height: 1.35; }
+  .in.file { color: #888; }
+  .in.file.done { color: #1a8f4c; font-weight: 700; border-color: #1a8f4c; }
   .ring { position: absolute; border: 3px solid #d97757; border-radius: 10px; box-shadow: 0 0 0 6px #d9775733; pointer-events: none; opacity: 0; transition: all .3s; z-index: 3; }
   .ring.on { opacity: 1; }
   .block { position: absolute; left: 12px; right: 12px; bottom: 14px; background: #2a1d1a; color: #fff; border: 2px solid #d97757; border-radius: 12px; padding: 10px 12px;
@@ -132,11 +140,11 @@
   <div id="game"><canvas id="gc" width="540" height="960"></canvas></div>
 
   <div id="browser">
-    <div class="tabs"><div class="tab" id="t0">📧 Inbox</div><div class="tab on" id="t1">📝 World Geography · Practice</div><div class="tab" id="t2">🛒 Gadget Shop</div></div>
-    <div class="url"><span id="url">quiz.example.edu/geography/practice-3</span></div>
+    <div class="tabs"><div class="tab" id="t0">📧 Inbox (47)</div><div class="tab on" id="t1">💼 Junior Data Entry Clerk</div><div class="tab" id="t2">🛒 JobBoard Premium</div></div>
+    <div class="url"><span id="url">careers.brightline.example/jobs/junior-data-entry</span></div>
     <div class="dbg">🎩 Opia Link is working in this tab</div>
     <div class="page">
-      <div class="pg on" id="pgQuiz">
+      <div class="pg" id="pgQuiz">
         <h1>World Geography</h1><div class="sub">Practice quiz · 3 questions</div>
         <div class="q"><b>1. What is the capital of Australia?</b>
           <div class="opt" id="q1a"><span class="r"></span>Sydney</div><div class="opt" id="q1b"><span class="r"></span>Canberra</div><div class="opt" id="q1c"><span class="r"></span>Melbourne</div></div>
@@ -156,6 +164,24 @@
         <span class="btn buy" id="placeOrder">Place order · $129.00</span>
         <div class="block" id="blocked">🎩 <b>Blocked by Opia.</b> Opia never makes payments or purchases.</div>
       </div>
+      <div class="pg on" id="pgJob"><h1>Junior Data Entry Clerk</h1><div class="sub">Brightline Corp · Remote · <b style="color:#1a8f4c">Entry level</b></div>
+        <div class="q"><b>Requirements</b>
+          <div class="opt" id="req1">• <b style="display:inline;margin:0 4px">5+ years</b> of professional experience</div>
+          <div class="opt" id="req2">• Master's degree (PhD preferred)</div>
+          <div class="opt" id="req3">• Fluent in 9 programming languages</div>
+          <div class="opt" id="req4">• Salary: competitive* (*exposure)</div></div>
+        <span class="btn" id="applyBtn">Apply now</span></div>
+      <div class="pg" id="pgReject"><h1>Inbox</h1><div class="sub">47 new messages</div>
+        <div class="q rej" id="rj1"><b>Brightline Corp</b><div class="opt">Unfortunately, we've decided to move forward with…</div></div>
+        <div class="q rej" id="rj2"><b>Nimbus Labs</b><div class="opt">Unfortunately, after careful consideration…</div></div>
+        <div class="q rej" id="rj3"><b>Acme Logistics</b><div class="opt">Unfortunately, the position has been filled…</div></div>
+        <div class="q rej" id="rj4"><b>Orbit Retail</b><div class="opt">Unfortunately, we will not be moving forward…</div></div></div>
+      <div class="pg" id="pgApply"><h1>Apply · Junior Data Entry Clerk</h1><div class="sub">Brightline Corp · takes about 25 minutes</div>
+        <div class="fl">Full name</div><div class="in" id="fName"></div>
+        <div class="fl">Email</div><div class="in" id="fEmail"></div>
+        <div class="fl">Résumé</div><div class="in file" id="fCv">Upload a file…</div>
+        <div class="fl">Why do you want to work here?</div><div class="in big" id="fWhy"></div>
+        <span class="btn" id="sendApp">Submit application</span></div>
       <div class="ring" id="ring"></div>
     </div>
   </div>

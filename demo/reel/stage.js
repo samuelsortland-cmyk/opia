@@ -5,7 +5,7 @@
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const petEl = $('pet'), panelEl = $('panel');
-  const pos = { x: W - P - 12, y: H - TASK - P };
+  const pos = { x: W - P - 12, y: H + 60 }; // off screen until a scene places Opia
   const cursor = { x: 270, y: 600 };
   const listeners = [];
   let allowMove = false;
@@ -54,7 +54,7 @@
 
   // ---------- browser helpers ----------
   function showPage(id, tab, url) {
-    ['pgQuiz', 'pgInbox', 'pgShop'].forEach((p) => $(p).classList.toggle('on', p === id));
+    ['pgQuiz', 'pgInbox', 'pgShop', 'pgJob', 'pgReject', 'pgApply'].forEach((p) => $(p).classList.toggle('on', p === id));
     ['t0', 't1', 't2'].forEach((t) => $(t).classList.toggle('on', t === tab));
     $('url').textContent = url;
   }
@@ -384,6 +384,119 @@
     async end() {
       resetScene(); await unsay(); $('endcard').classList.add('on');
       await sleep(3000);
+    },
+  };
+
+  // ================================================================== reel v3: the job-application meme
+  function setTabs(a, b, c) { $('t0').textContent = a; $('t1').textContent = b; $('t2').textContent = c; }
+  async function typeField(id, text, perChar = 22) {
+    const el = $(id); el.classList.add('act');
+    for (let i = 1; i <= text.length; i++) { el.textContent = text.slice(0, i); await sleep(perChar); }
+    el.classList.remove('act');
+  }
+  window.reel3 = {
+    // 1. The meme setup: "entry level" job wants 5 years of experience
+    async hook() {
+      resetScene(); game(false); panel(false); browser('front');
+      setTabs('📧 Inbox (47)', '💼 Junior Data Entry Clerk', '🛒 JobBoard Premium');
+      showPage('pgJob', 't1', 'careers.brightline.example/jobs/junior-data-entry');
+      setPet(W - P - 8, H + 60); // Opia isn't here yet (fully off screen)
+      punch(1.08, 270, 420, 2200);
+      await say(['*entry* *level* job:'], { gap: 90 });
+      await sleep(250);
+      ringOn($('req1')); punch(1.35, 150, 470, 220); shake(9, 220);
+      await say(['*entry* *level* job:', 'requires _5_ _years_', 'experience 💀'], { gap: 85 });
+      await sleep(550);
+    },
+    // 2. Despair: the rejections pile up
+    async rejected() {
+      ringOff(); await punch(1, W / 2, H / 2, 120); await unsay();
+      showPage('pgReject', 't0', 'mail.example.com/inbox'); flash();
+      ['rj1', 'rj2', 'rj3', 'rj4'].forEach((r) => $(r).classList.remove('on'));
+      say(['me after', 'application _#47_:'], { gap: 80 });
+      for (const r of ['rj1', 'rj2', 'rj3', 'rj4']) { $(r).classList.add('on'); shake(4, 120); await sleep(230); }
+      sticker('😭', 430, 470, 72); sticker('💀', 120, 640, 56);
+      await sleep(650);
+    },
+    // 3. The turn: Opia crashes in
+    async hire() {
+      resetScene(); await unsay(); browser('hidden'); flash();
+      setPet(360, -P - 20);
+      onBounce = (h) => { if (h > 300) { shake(Math.min(14, h / 70), 240); const c = petCenter(); sticker('💥', c.x - 40, c.y + 30, 64); } };
+      fling(-380, 700, { g: 2600, maxMs: 2200 });
+      await sleep(80);
+      await say(['so I gave my', '*desktop* *pet*', 'a _JOB_ 💼'], { gap: 105 });
+      await sleep(850); onBounce = null;
+    },
+    // 4. Ask Opia in its chat panel
+    async ask() {
+      resetScene(); flingSeq++; await unsay(); browser('back');
+      showPage('pgApply', 't1', 'careers.brightline.example/apply');
+      ['fName', 'fEmail', 'fWhy'].forEach((f) => { $(f).textContent = ''; }); $('fCv').textContent = 'Upload a file…'; $('fCv').classList.remove('done');
+      setPet(W - P - 8, H - TASK - P); panel(true);
+      say(['you:', '"*apply* for me"'], { small: true, gap: 70 });
+      punch(1.12, 270, 560, 900);
+      await sleep(200);
+      await typeInPanel('Apply to this job for me, résumé is in Documents', 12);
+      emit({ type: 'status', mood: 'thinking', text: 'Hired! On it 🎩' });
+      const c = petCenter(); sticker('🫡', c.x - 70, c.y - 70, 60);
+      emit({ type: 'tool', name: 'mcp__playwright__browser_snapshot', summary: 'Reading the job post' });
+      await sleep(400);
+      emit({ type: 'tool', name: 'Read', summary: 'Reading résumé.pdf' });
+      await sleep(350);
+    },
+    // 5. The payoff: the application gets filled in, in the user's tab
+    async apply() {
+      panel(false); browser('front'); await punch(1, W / 2, H / 2, 140); flash(); await unsay();
+      say(['it fills it *IN*', 'your tab 🤯'], { gap: 75 });
+      emit({ type: 'tool', name: 'mcp__playwright__browser_type', summary: 'Typing your name' });
+      punch(1.1, 220, 420, 160);
+      await typeField('fName', 'Alex Rivera', 26);
+      await typeField('fEmail', 'alex.rivera@example.com', 14);
+      emit({ type: 'tool', name: 'mcp__playwright__browser_file_upload', summary: 'Attaching résumé.pdf' });
+      $('fCv').textContent = '📄 resume.pdf ✓'; $('fCv').classList.add('done'); sticker('📎', 470, 470, 40);
+      await sleep(160);
+      emit({ type: 'tool', name: 'mcp__playwright__browser_type', summary: 'Writing why you want the job' });
+      await typeField('fWhy', 'I love tidy spreadsheets and I learn fast. Excited to grow with the Brightline team!', 9);
+      punch(1, W / 2, H / 2, 120);
+      ringOn($('sendApp')); await sleep(160); ringOff();
+      shake(11, 280); stamp('APPLIED ✅', '#1a9a4f'); confetti(270, 470, 48);
+      emit({ type: 'done', result: 'Applied! Fingers crossed 🎩🤞', durationMs: 8000 });
+      await sleep(1200);
+    },
+    // 6. Meanwhile, gaming (it keeps applying)
+    async gaming() {
+      resetScene(); await unsay(); game(true); browser('mini');
+      setTabs('📧 Inbox', '💼 Applications', '🛒 JobBoard Premium');
+      showPage('pgInbox', 't0', 'mail.example.com/inbox');
+      $('toast').classList.remove('show'); setPet(W - P - 6, H - TASK - P - 4); flash();
+      say(['meanwhile you’re', '*gaming* 🎮'], { gap: 80 });
+      emit({ type: 'status', mood: 'browsing', text: 'Filling in application #3' });
+      await sleep(900);
+      toast('Done: 3 applications sent 📨', 2400); sticker('🔔', 455, 600, 50);
+      emit({ type: 'done', result: '3 applications sent! 🎩', durationMs: 5000 });
+      await sleep(1100);
+    },
+    // 7. No payments: not even "Premium"
+    async noPay() {
+      resetScene(); await unsay(); game(false); browser('front');
+      setTabs('📧 Inbox', '💼 Applications', '🛒 JobBoard Premium');
+      showPage('pgShop', 't2', 'jobboard.example.com/premium/checkout');
+      const pg = $('pgShop');
+      pg.querySelector('.cart b').textContent = 'JobBoard Premium · see who viewed you';
+      pg.querySelector('.cart .sub').textContent = '$39.99 / month';
+      $('placeOrder').textContent = 'Subscribe · $39.99/mo';
+      $('blocked').classList.remove('on'); setPet(W - P - 8, H - TASK - P); flash();
+      say(['tries to buy', '_Premium_ ($39.99/mo)…'], { small: true, gap: 70 });
+      await sleep(400);
+      ringOn($('placeOrder')); punch(1.12, 160, 600, 200);
+      emit({ type: 'tool', name: 'mcp__playwright__browser_click', summary: 'Clicking Subscribe' });
+      await sleep(330); ringOff(); punch(1, 160, 600, 120);
+      $('blocked').classList.add('on'); stamp('BLOCKED 🚫', '#d2302a'); shake(14, 320); flash('#ff3b30');
+      emit({ type: 'status', mood: 'error', text: 'No payments! 🎩' });
+      await sleep(500); await unsay();
+      say(['never spends', 'your *money* 💸'], { gap: 75 });
+      await sleep(850);
     },
   };
 })();

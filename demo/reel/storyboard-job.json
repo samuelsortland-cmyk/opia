@@ -1,0 +1,24 @@
+{
+  "output": "opia-reel-job.mp4",
+  "baseUrl": "http://127.0.0.1:8790",
+  "frame": false,
+  "viewport": { "width": 1080, "height": 1920 },
+  "theme": { "accent": "#d97757", "bg": "#1f1a17", "fg": "#fbf6f2" },
+  "targetSeconds": 28,
+  "maxStill": 0,
+  "bpm": 140,
+  "musicVolume": 0.6,
+  "transitions": false,
+  "note": "Job-application meme cut. Captions, zooms, shakes, stickers and the end card are drawn by the stage (demo/reel/stage.js, reel3.* and reel2.*).",
+  "scenes": [
+    { "steps": [ { "goto": "/", "pause": 0 }, { "eval": "reel3.hook()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel3.rejected()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel3.hire()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel3.ask()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel3.apply()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel3.gaming()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.yeet()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel3.noPay()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.end()", "pause": 0 } ], "hold": 0 }
+  ]
+}
