@@ -278,7 +278,7 @@
 
   $('btn-settings').addEventListener('click', () => {
     settingsEl.hidden = !settingsEl.hidden;
-    if (!settingsEl.hidden) loadSettings();
+    if (!settingsEl.hidden) { loadSettings(); refreshExtension(); }
   });
 
   async function saveSettings() {
@@ -291,8 +291,38 @@
     $('settings-saved').textContent = 'Saved ✓ (applies to the next task)';
     setTimeout(() => { $('settings-saved').textContent = ''; }, 2500);
     checkClaude();
+    refreshExtension({ card: true });
   }
   $('btn-settings-save').addEventListener('click', saveSettings);
+
+  // ------------------------------------------------------------ "my browser" extension setup
+
+  const BROWSER_NAME = { msedge: 'Edge', chrome: 'Chrome' };
+  let extCard = null;
+  async function refreshExtension({ card = false } = {}) {
+    let ext, st;
+    try { [ext, st] = await Promise.all([opia.checkExtension(), opia.getSettings()]); } catch (_) { return; }
+    const where = ext.installed ? `${BROWSER_NAME[ext.browser] || ext.browser}${ext.profile && ext.profile !== 'Default' ? ' (' + ext.profile + ')' : ''}` : '';
+    $('ext-status').textContent = ext.installed ? `✓ Playwright Extension found in ${where}` : '✗ Playwright Extension not installed yet';
+    $('btn-ext-install').hidden = !!ext.installed;
+    if (ext.installed && extCard) { extCard.remove(); extCard = null; addMsg('meta', `✓ Extension found in ${where}. I'll work in your own tabs now.`); }
+    if (card && !ext.installed && st.browserMode === 'mine' && !extCard) {
+      extCard = addMsg('meta setup-card', `🧐 To work in <b>your own Edge tabs</b>, I need the free Playwright Extension (one-time, about a minute).
+        <div class="setup-actions">
+          <button class="ext-install">Install in Edge</button>
+          <button class="ext-recheck">I installed it</button>
+          <button class="ext-separate">Use my own invisible browser instead</button>
+        </div>`);
+      extCard.querySelector('.ext-install').addEventListener('click', () => opia.installExtension());
+      extCard.querySelector('.ext-recheck').addEventListener('click', () => refreshExtension());
+      extCard.querySelector('.ext-separate').addEventListener('click', async () => {
+        await opia.setSettings({ browserMode: 'separate' });
+        extCard.remove(); extCard = null;
+        addMsg('meta', 'OK, I\'ll browse in my own invisible browser. Change it any time in Settings.');
+      });
+    }
+  }
+  $('btn-ext-install').addEventListener('click', () => opia.installExtension());
 
   // ------------------------------------------------------------ updates
 
@@ -343,6 +373,8 @@
 
   window.addEventListener('focus', () => promptEl.focus());
   checkClaude();
+  refreshExtension({ card: true });
+  window.addEventListener('focus', () => { if (extCard) refreshExtension(); });
   refreshState();
   autosize();
 })();

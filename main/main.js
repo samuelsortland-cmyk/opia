@@ -410,6 +410,16 @@ function registerIpc() {
   ipcMain.handle('claude:check', async () => {
     try { return await checkClaudeFn(settings.get()); } catch (err) { return { installed: false, error: err.message }; }
   });
+  ipcMain.handle('browser:extension', () => {
+    try { return require('./agent').findExtension(); } catch (err) { return { installed: false, error: err.message }; }
+  });
+  ipcMain.handle('browser:installExtension', async () => {
+    const store = 'https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm';
+    // Open the store page in Edge on Windows (the extension must be installed in the browser Opia uses).
+    const url = process.platform === 'win32' ? 'microsoft-edge:' + store : store;
+    try { await shell.openExternal(url); } catch (_) { await shell.openExternal(store); }
+    return { ok: true };
+  });
   ipcMain.handle('update:check', () => (updater ? updater.check() : { state: 'error', message: 'Updater unavailable' }));
   ipcMain.handle('update:apply', () => (updater ? updater.apply() : { state: 'error', message: 'Updater unavailable' }));
   ipcMain.handle('update:state', () => (updater ? { ...updater.state, installed: updater.installedSha() } : { state: 'idle' }));

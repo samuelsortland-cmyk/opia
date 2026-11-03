@@ -12,7 +12,7 @@ const DEFAULTS = Object.freeze({
   model: '',
   browser: '', // '' = auto-detect installed Edge/Chrome/Brave/Chromium (Edge first) | 'chrome' | 'msedge' | 'chromium' | 'firefox'
   browserPath: '', // optional explicit browser executable; overrides `browser`
-  browserMode: 'separate', // 'separate' = Opia's own browser (no setup) | 'mine' = your open Chrome/Edge tab (needs the Playwright Extension)
+  browserMode: 'mine', // 'mine' = a tab in your own Edge/Chrome (needs the Playwright Extension) | 'separate' = Opia's own invisible browser
   extensionToken: '', // PLAYWRIGHT_MCP_EXTENSION_TOKEN from the Playwright Extension (skips the connect dialog)
   browserProfile: '', // optional Chrome profile dir name for extension mode, e.g. "Profile 1"
   quiet: true, // never take keyboard focus on its own (safe while gaming)
@@ -22,6 +22,7 @@ const DEFAULTS = Object.freeze({
   updateBranch: 'main',
   updatePath: '', // folder inside the repo that holds Opia ('' = the repo root)
   updateToken: '', // optional read-only GitHub token, needed only if the repo is private
+  settingsVersion: 2,
 });
 
 class Settings {
@@ -31,6 +32,11 @@ class Settings {
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       this.data = { ...DEFAULTS, ...sanitize(raw) };
+      // v2: Opia works in your own browser tab by default (was: its own invisible browser).
+      if (!(raw.settingsVersion >= 2)) {
+        this.data.browserMode = 'mine';
+        this.data.settingsVersion = 2;
+      }
       // Opia moved from the claude-team repo to its own repo: follow it.
       if (this.data.updateRepo === 'samuelsortland-cmyk/claude-team') {
         Object.assign(this.data, { updateRepo: DEFAULTS.updateRepo, updateBranch: DEFAULTS.updateBranch, updatePath: DEFAULTS.updatePath });

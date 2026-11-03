@@ -40,14 +40,17 @@ When you finish, say in one or two sentences what you did and what you found.`;
 
 const BROWSER_RULES = {
   // Default: drive the user's own, already-open Chrome/Edge tab via the Playwright Extension.
-  mine: `Browser: for anything on the web, use the mcp__playwright__ tools. They drive the user's OWN Chrome/Edge through the Playwright Extension, in an existing tab the user shares (on the first browser action a small page asks them to pick the tab), with their normal logins.
-The user is usually busy with something else (for example playing a game), so work quietly in the background: stay in the shared tab and navigate it rather than opening new tabs or windows (only open a new tab if the user asks or the task really needs it), never bring the browser to the front, and never ask the user to look unless you are blocked.
-Your clicks and typing go straight into the page, not through the user's real mouse or keyboard, so you will not interfere with what they are doing. Read pages with browser_snapshot (the tab may be in the background, so prefer snapshots over screenshots).
-If the browser tools say the extension is not connected, tell the user to install the "Playwright Extension" in Chrome/Edge (see Opia's Settings) and keep the browser open.`,
+  mine: `Browser: for anything on the web, use the mcp__playwright__ tools. They drive the user's OWN Edge/Chrome through the Playwright Extension, in an existing tab the user shares, with their normal logins. When a task starts, the browser shows a small page where the user picks which tab you may use (or connects automatically if they saved the extension token).
+When the user talks about "my tab", "this page", "this quiz" or what's on their screen, work IN THAT TAB: read it with browser_snapshot and fill it in or click there, so the result shows in their browser. Don't open the same site in a new tab or redo the work elsewhere. Only open a new tab if the user asks or the task really needs it.
+The user may be busy with something else, so work quietly: never bring the browser to the front, and never ask the user to look unless you are blocked. Your clicks and typing go straight into the page, not through the user's real mouse or keyboard. Prefer browser_snapshot over screenshots (the tab may be in the background).
+If the browser tools say the extension is not connected, tell the user: open Edge, make sure the Playwright Extension is installed (Opia's Settings has an Install button), then ask again.`,
   // Optional: a separate Opia-only browser profile.
   separate: `Browser: for anything on the web, use the mcp__playwright__ tools. They drive Opia's own browser: a separate profile that is not the user's browser and usually runs invisibly (headless), so work there freely in the background; the user may be busy, for example playing a game. Never try to control the user's own browser, windows, mouse or keyboard. Take a browser_snapshot to read a page before clicking.
 Logins are remembered in Opia's browser profile. If a site needs a login, don't type credentials: ask the user to switch off "Hide Opia's browser" in Opia's Settings, sign in once in that window, and switch it back on.`,
 };
+
+const NO_EXTENSION_NOTE = `
+IMPORTANT: right now you have NO browser tools, because the Playwright Extension is not installed in the user's Edge/Chrome yet. If the task needs a web page, don't pretend: say in one or two sentences that they should click "Install in Edge" in Opia's panel (or Settings), add the extension, then ask again. Or they can switch "Where Opia browses" to Opia's own invisible browser. You can still look at their screen and do non-browser tasks.`;
 
 function buildPersona(s) {
   return PERSONA_TEMPLATE.replace('{{BROWSER_RULES}}', BROWSER_RULES[s.browserMode === 'mine' ? 'mine' : 'separate']);
@@ -168,6 +171,42 @@ function checkClaude(arg) {
 // Find an installed Chromium-family browser for Playwright MCP, preferring Microsoft Edge
 // (always present on Windows), then Chrome, Brave and Chromium.
 // Returns '' when none is found, so Playwright falls back to its own default (Chrome).
+// The Playwright Extension's id (same in the Chrome Web Store and in Edge).
+const PLAYWRIGHT_EXTENSION_ID = 'mmlmfjhmonkocbjadbfplnigmagldckm';
+
+/**
+ * Is the Playwright Extension installed in Edge or Chrome? Looks in each browser profile's
+ * Extensions folder. Returns { installed, browser: 'msedge'|'chrome', profile, browsers: [...] }.
+ */
+function findExtension() {
+  const home = os.homedir();
+  const local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+  const roots = process.platform === 'darwin' ? [
+    ['msedge', path.join(home, 'Library/Application Support/Microsoft Edge')],
+    ['chrome', path.join(home, 'Library/Application Support/Google/Chrome')],
+  ] : IS_WIN ? [
+    ['msedge', path.join(local, 'Microsoft/Edge/User Data')],
+    ['chrome', path.join(local, 'Google/Chrome/User Data')],
+  ] : [
+    ['msedge', path.join(home, '.config/microsoft-edge')],
+    ['chrome', path.join(home, '.config/google-chrome')],
+  ];
+  const browsers = [];
+  for (const [browser, root] of roots) {
+    let profiles = [];
+    try { profiles = fs.readdirSync(root).filter((d) => d === 'Default' || /^Profile \d+$/.test(d)); } catch { continue; }
+    browsers.push(browser);
+    for (const profile of profiles) {
+      try {
+        if (fs.statSync(path.join(root, profile, 'Extensions', PLAYWRIGHT_EXTENSION_ID)).isDirectory()) {
+          return { installed: true, browser, profile, browsers };
+        }
+      } catch (_) {}
+    }
+  }
+  return { installed: false, browser: browsers[0] || 'msedge', profile: '', browsers };
+}
+
 function findInstalledBrowser() {
   const home = os.homedir();
   const pf = process.env['PROGRAMFILES'] || 'C:\\Program Files';
@@ -234,7 +273,7 @@ class OpiaAgent extends EventEmitter {
       model: s.model || '',
       browser: s.browser || '',
       browserPath: s.browserPath || '',
-      browserMode: s.browserMode === 'mine' ? 'mine' : 'separate',
+      browserMode: s.browserMode === 'separate' ? 'separate' : 'mine',
       extensionToken: s.extensionToken || '',
       browserProfile: s.browserProfile || '', // optional browser profile dir name for 'mine' mode, e.g. 'Profile 1'
       screenAccess: s.screenAccess !== false,
@@ -331,13 +370,28 @@ class OpiaAgent extends EventEmitter {
     fs.mkdirSync(profile, { recursive: true });
 
     let pwArgs;
+    let noBrowser = false;
     const pwEnv = {};
     if (s.browserMode === 'mine') {
       // Work in the user's own, already-open browser (existing tab, their logins) via the
       // Playwright Extension. Input goes through the browser's debugger channel, not the OS
       // mouse/keyboard, so it never fights the user for input (e.g. while they play a game).
       pwArgs = ['--extension'];
-      if (s.browserProfile) pwArgs.push('--profile-dir-name', s.browserProfile);
+      // Without the extension, extension mode would wait forever for it to connect, so leave
+      // the browser out and let Opia explain how to set it up. A saved token or profile means
+      // the user set it up themselves (e.g. in a browser folder we don't scan).
+      const extFound = findExtension();
+      if (!extFound.installed && !s.extensionToken && !s.browserProfile) noBrowser = true;
+      // The connect page must open in the browser that has the extension (Playwright defaults
+      // to Chrome, which many Windows users don't have): use the setting, else where we find
+      // the extension installed, else Edge if it's installed.
+      const ext = findExtension();
+      const channel = ['msedge', 'chrome'].includes(s.browser) ? s.browser
+        : ext.installed ? ext.browser
+        : /edge/i.test(findInstalledBrowser()) ? 'msedge' : 'chrome';
+      pwArgs.push('--browser', channel);
+      const profile = s.browserProfile || (ext.installed && ext.browser === channel ? ext.profile : '');
+      if (profile) pwArgs.push('--profile-dir-name', profile);
       // The token (shown in the extension's UI) skips the per-connection approval dialog.
       if (s.extensionToken) pwEnv.PLAYWRIGHT_MCP_EXTENSION_TOKEN = s.extensionToken;
     } else {
@@ -364,7 +418,7 @@ class OpiaAgent extends EventEmitter {
 
     const cfg = {
       mcpServers: {
-        playwright,
+        ...(noBrowser ? {} : { playwright }),
         opia: {
           type: 'stdio',
           command: process.execPath,
@@ -376,8 +430,8 @@ class OpiaAgent extends EventEmitter {
     const file = path.join(this.userDataDir, 'opia-mcp.json');
     fs.writeFileSync(file, JSON.stringify(cfg, null, 2), { mode: 0o600 });
     const sp = path.join(this.userDataDir, 'opia-persona.md');
-    fs.writeFileSync(sp, buildPersona(s));
-    return { mcpFile: file, personaFile: sp };
+    fs.writeFileSync(sp, buildPersona(s) + (noBrowser ? NO_EXTENSION_NOTE : ''));
+    return { mcpFile: file, personaFile: sp, noBrowser };
   }
 
   _buildArgs(s, files, resume) {
@@ -517,6 +571,11 @@ class OpiaAgent extends EventEmitter {
             this._status('thinking', block.is_error ? 'Hmm, that didn’t work…' : 'Mulling it over…');
             const txt = typeof block.content === 'string' ? block.content : JSON.stringify(block.content || '');
             if (!browserHinted && /mcp__playwright__/.test(toolNames.get(block.tool_use_id) || '') &&
+                /extension did not connect|extension is not connected|Extension connection/i.test(txt)) {
+              browserHinted = true;
+              this._emit({ type: 'assistant', text: '(I couldn’t connect to your browser. Open Edge, check the Playwright Extension is installed (Settings → Install in Edge), pick a tab when it asks, then try again.)' });
+            }
+            if (!browserHinted && /mcp__playwright__/.test(toolNames.get(block.tool_use_id) || '') &&
                 /distribution '?\w+'? is not found|Executable doesn't exist|browser_install|not installed/i.test(txt)) {
               browserHinted = true;
               this._emit({ type: 'assistant', text: '(I couldn’t find a browser to drive. Install Microsoft Edge or Google Chrome, or run `npx playwright install chromium` and pick "chromium" as my browser in Settings.)' });
@@ -613,4 +672,4 @@ class OpiaAgent extends EventEmitter {
   }
 }
 
-module.exports = { OpiaAgent, checkClaude, resolveClaude, SAFE_TOOLS };
+module.exports = { OpiaAgent, checkClaude, resolveClaude, findExtension, PLAYWRIGHT_EXTENSION_ID, SAFE_TOOLS };

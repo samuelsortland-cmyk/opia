@@ -42,11 +42,15 @@
     <label class="row">
       <span>Where Opia browses</span>
       <select id="set-browserMode">
-        <option value="separate">Opia's own browser (no setup needed)</option>
-        <option value="mine">My browser: an existing tab (needs the Playwright Extension)</option>
+        <option value="mine">My browser: works in my own Edge/Chrome tab</option>
+        <option value="separate">Opia's own invisible browser (no setup)</option>
       </select>
     </label>
-    <p class="hint">Opia's own browser needs no setup and remembers logins: to sign in to a site, untick "Hide Opia's browser", log in once in its window, then tick it again. "My browser" works in a tab you already have open, but needs the Playwright Extension in Chrome or Edge.</p>
+    <div class="row ext-row">
+      <span id="ext-status">Checking for the Playwright Extension…</span>
+      <button id="btn-ext-install" type="button">Install in Edge</button>
+    </div>
+    <p class="hint"><b>My browser</b> needs the free Playwright Extension in Edge (one time): click <b>Install in Edge</b>, then <b>Get</b>. If Edge asks, choose <b>Allow extensions from other stores</b>. When a task starts, Edge asks which tab Opia may use. Paste the extension's token below to skip that question. <b>Opia's own invisible browser</b> needs no setup, but its results don't appear in your tabs.</p>
     <label class="row">
       <span>Extension token (optional)</span>
       <input type="password" id="set-extensionToken" spellcheck="false" placeholder="PLAYWRIGHT_MCP_EXTENSION_TOKEN">
@@ -128,7 +132,7 @@
   <main id="log" aria-live="polite">
     <div class="msg system">
       Hi! I'm <b>Opia 5.5</b>, at your service 🎩🧐 Ask me to do something on your computer or the web.
-      I browse in my own invisible browser, without touching your mouse, keyboard or windows, so you can keep playing or working while I work.
+      I work right inside your own Edge tabs, reading and clicking in the page without touching your mouse or keyboard, so you can keep playing or working while I work.
       <div class="examples">
         <button class="example">Find the 3 top stories on Hacker News and summarize them</button>
         <button class="example">What's taking up the most space in my Downloads folder?</button>

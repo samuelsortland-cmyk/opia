@@ -324,3 +324,8 @@ button.icon:hover { background: var(--bg-3); color: var(--text); border-color: v
 .update-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .update-row #update-status { flex: 1; color: var(--muted); font-size: 12px; }
 .msg.update .update-now { margin-left: 6px; }
+
+/* "my browser" setup */
+.ext-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ext-row #ext-status { flex: 1; font-size: 12px; color: var(--muted); }
+.msg.setup-card .setup-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
