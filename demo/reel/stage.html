@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Opia 5.5 reel stage</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #111; font-family: "Segoe UI", Inter, system-ui, sans-serif; }
+  /* Everything is laid out at 540x960 and drawn at 2x for a crisp 1080x1920 Reel. */
+  #app { position: absolute; left: 0; top: 0; width: 540px; height: 960px; zoom: 2; overflow: hidden; }
+
+  /* Reels-sized captions from the recorder: big, and above Instagram's bottom UI. */
+  #__rec_cap { top: 196px !important; bottom: auto !important; max-width: 90% !important; font-size: 50px !important; line-height: 1.18 !important;
+    padding: 22px 34px 24px 30px !important; border-radius: 22px !important; border-left-width: 8px !important; text-align: center !important; }
+  #__rec_cur { display: none !important; }
+
+  #wall { position: absolute; inset: 0; background:
+      radial-gradient(500px 420px at 85% 8%, #f3b38f 0%, rgba(243,179,143,0) 60%),
+      radial-gradient(520px 520px at 0% 100%, #3b4a7a 0%, rgba(59,74,122,0) 70%),
+      linear-gradient(165deg, #2a2f52 0%, #6b4b6e 48%, #d98c6a 100%); }
+  .icon { position: absolute; left: 16px; width: 64px; text-align: center; color: #fff; font-size: 10px; text-shadow: 0 1px 2px #0008; }
+  .icon i { display: block; width: 40px; height: 34px; margin: 0 auto 4px; border-radius: 7px; background: linear-gradient(#8fc3ff, #4b8fe0); }
+  #taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 34px; background: #161826e0; display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #ddd; font-size: 11px; z-index: 4; }
+  #taskbar .app { width: 20px; height: 20px; border-radius: 6px; background: #ffffff22; }
+  #taskbar .app.on { background: #ffffff66; }
+  #taskbar .clock { margin-left: auto; }
+
+  #game { position: absolute; inset: 0; display: none; z-index: 3; }
+  #game canvas { width: 100%; height: 100%; display: block; }
+
+  /* the user's Edge window */
+  #browser { position: absolute; left: 14px; top: 228px; width: 512px; height: 590px; background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 16px 44px #0009; z-index: 5; transition: all .6s cubic-bezier(.2,.8,.2,1); }
+  #browser.mini { left: 18px; top: 236px; width: 300px; height: 330px; z-index: 9; outline: 3px solid #d97757; }
+  #browser.back { transform: scale(.94) translateY(-10px); opacity: .55; filter: blur(.5px); }
+  .tabs { height: 34px; background: #dee1e6; display: flex; align-items: flex-end; padding: 0 6px; gap: 3px; }
+  .tab { height: 28px; padding: 6px 10px; font-size: 11px; color: #444; border-radius: 8px 8px 0 0; white-space: nowrap; overflow: hidden; max-width: 160px; }
+  .tab.on { background: #fff; color: #111; font-weight: 600; }
+  .url { height: 32px; display: flex; align-items: center; padding: 0 8px; border-bottom: 1px solid #e3e3e3; }
+  .url span { flex: 1; background: #f1f3f4; border-radius: 14px; padding: 5px 12px; font-size: 11px; color: #333; }
+  .dbg { background: #fff8d6; color: #5c4a00; font-size: 10.5px; padding: 5px 10px; border-bottom: 1px solid #eedc8a; }
+  .page { position: relative; height: calc(100% - 92px); overflow: hidden; }
+  .pg { position: absolute; inset: 0; padding: 16px 18px; color: #1d1d1f; opacity: 0; transition: opacity .3s; }
+  .pg.on { opacity: 1; }
+  .pg h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 11.5px; margin-bottom: 10px; }
+  .q { border: 1px solid #e6e6ea; border-radius: 10px; padding: 9px 11px; margin-bottom: 9px; }
+  .q b { display: block; font-size: 12.5px; margin-bottom: 6px; }
+  .opt { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 6px; border-radius: 7px; transition: background .25s; }
+  .opt .r { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #9aa0aa; flex: 0 0 auto; transition: all .2s; }
+  .opt.sel { background: #e8f0ff; }
+  .opt.sel .r { border-color: #2f6fde; background: radial-gradient(#2f6fde 45%, transparent 50%); }
+  .btn { display: inline-block; background: #2f6fde; color: #fff; border-radius: 9px; padding: 8px 16px; font-size: 12.5px; font-weight: 600; }
+  .score { display: inline-block; margin-left: 10px; font-weight: 800; color: #1a8f4c; font-size: 15px; opacity: 0; transform: scale(.6); transition: all .35s cubic-bezier(.2,1.4,.4,1); }
+  .score.on { opacity: 1; transform: none; }
+  .cart { display: flex; gap: 10px; align-items: center; border: 1px solid #e6e6ea; border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+  .cart i { width: 46px; height: 46px; border-radius: 8px; background: linear-gradient(135deg, #222, #555); }
+  .field { border: 1.5px solid #ccd; border-radius: 9px; padding: 9px 11px; font-size: 12px; color: #999; margin: 6px 0 12px; }
+  .buy { background: #f0a020; color: #111; }
+  .ring { position: absolute; border: 3px solid #d97757; border-radius: 10px; box-shadow: 0 0 0 6px #d9775733; pointer-events: none; opacity: 0; transition: all .3s; z-index: 3; }
+  .ring.on { opacity: 1; }
+  .block { position: absolute; left: 12px; right: 12px; bottom: 14px; background: #2a1d1a; color: #fff; border: 2px solid #d97757; border-radius: 12px; padding: 10px 12px;
+    font-size: 12px; line-height: 1.35; opacity: 0; transform: translateY(14px); transition: all .35s cubic-bezier(.2,.9,.3,1.2); z-index: 4; }
+  .block.on { opacity: 1; transform: none; }
+
+  iframe { position: absolute; border: 0; background: transparent; }
+  #pet { width: 190px; height: 190px; z-index: 20; }
+  #panel { left: 20px; top: 222px; width: 500px; height: 520px; z-index: 19; border-radius: 14px; box-shadow: 0 18px 50px #000a;
+    opacity: 0; transform: translateY(18px) scale(.97); transition: opacity .35s, transform .35s; pointer-events: none; }
+  #panel.open { opacity: 1; transform: none; }
+
+  #toast { position: absolute; left: 50%; top: 600px; width: 380px; margin-left: -190px; background: #1f2130f2; color: #eee; border-radius: 14px; padding: 12px 14px;
+    font-size: 12.5px; z-index: 25; box-shadow: 0 10px 30px #0008; display: flex; gap: 10px; align-items: center; opacity: 0; transform: translateY(30px) scale(.96); transition: all .45s cubic-bezier(.2,.9,.3,1.2); }
+  #toast.show { opacity: 1; transform: none; }
+  #toast img { width: 34px; height: 34px; image-rendering: pixelated; }
+  #toast b { display: block; color: #fff; }
+  #note { position: absolute; right: 10px; top: 6px; z-index: 30; font-size: 8.5px; color: #fff9; background: #0005; padding: 2px 6px; border-radius: 5px; }
+  #cur { position: absolute; z-index: 60; width: 34px; height: 44px; pointer-events: none; filter: drop-shadow(0 2px 3px #0009); left: 270px; top: 600px; opacity: 0; transition: opacity .25s; }
+  #cur.on { opacity: 1; }
+</style></head>
+<body><div id="app">
+  <div id="wall">
+    <div class="icon" style="top:24px"><i></i>Documents</div>
+    <div class="icon" style="top:90px"><i></i>Downloads</div>
+  </div>
+  <div id="game"><canvas id="gc" width="540" height="960"></canvas></div>
+
+  <div id="browser">
+    <div class="tabs"><div class="tab" id="t0">📧 Inbox</div><div class="tab on" id="t1">📝 World Geography · Practice</div><div class="tab" id="t2">🛒 Gadget Shop</div></div>
+    <div class="url"><span id="url">quiz.example.edu/geography/practice-3</span></div>
+    <div class="dbg">🎩 Opia Link is working in this tab</div>
+    <div class="page">
+      <div class="pg on" id="pgQuiz">
+        <h1>World Geography</h1><div class="sub">Practice quiz · 3 questions</div>
+        <div class="q"><b>1. What is the capital of Australia?</b>
+          <div class="opt" id="q1a"><span class="r"></span>Sydney</div><div class="opt" id="q1b"><span class="r"></span>Canberra</div><div class="opt" id="q1c"><span class="r"></span>Melbourne</div></div>
+        <div class="q"><b>2. Which is the longest river in Africa?</b>
+          <div class="opt" id="q2a"><span class="r"></span>The Nile</div><div class="opt" id="q2b"><span class="r"></span>The Congo</div><div class="opt" id="q2c"><span class="r"></span>The Niger</div></div>
+        <div class="q"><b>3. Which country has the most people?</b>
+          <div class="opt" id="q3a"><span class="r"></span>United States</div><div class="opt" id="q3b"><span class="r"></span>Indonesia</div><div class="opt" id="q3c"><span class="r"></span>India</div></div>
+        <span class="btn" id="submit">Submit answers</span><span class="score" id="score">✓ 3 / 3</span>
+      </div>
+      <div class="pg" id="pgInbox"><h1>Inbox</h1><div class="sub">3 new messages</div>
+        <div class="q"><b>Coach Rivera</b><div class="opt">Practice moved to 4:30 on Thursday</div></div>
+        <div class="q"><b>Library</b><div class="opt">Your book is due back Friday</div></div>
+        <div class="q"><b>Maya</b><div class="opt">Movie night this weekend? 🍿</div></div></div>
+      <div class="pg" id="pgShop"><h1>Checkout</h1><div class="sub">Gadget Shop</div>
+        <div class="cart"><i></i><div><b style="font-size:13px">Wireless Headphones</b><div class="sub" style="margin:2px 0 0">$129.00</div></div></div>
+        <div style="font-size:12px;font-weight:600">Card number</div><div class="field">1234 5678 9012 3456</div>
+        <span class="btn buy" id="placeOrder">Place order · $129.00</span>
+        <div class="block" id="blocked">🎩 <b>Blocked by Opia.</b> Opia never makes payments or purchases.</div>
+      </div>
+      <div class="ring" id="ring"></div>
+    </div>
+  </div>
+
+  <iframe id="panel" src="/renderer/panel.html"></iframe>
+  <iframe id="pet" src="/renderer/index.html" allowtransparency="true"></iframe>
+
+  <div id="toast"><img src="/assets/opia-icon.png" alt=""><div><b>Opia 5.5</b><span id="toastText"></span></div></div>
+  <div id="taskbar"><div class="app on"></div><div class="app" id="tbEdge"></div><div class="app" id="tbGame"></div><span class="clock">4:20 PM</span></div>
+  <div id="note">Real Opia app · demo sequence</div>
+  <svg id="cur" viewBox="0 0 22 30"><path d="M2 2 L2 24 L8 18 L12 28 L16 26 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>
+</div>
+<script src="/demo/reel/stage.js"></script>
+</body></html>

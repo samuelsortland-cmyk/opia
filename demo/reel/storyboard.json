@@ -1,0 +1,30 @@
+{
+  "output": "opia-reel.mp4",
+  "baseUrl": "http://127.0.0.1:8790",
+  "frame": false,
+  "viewport": { "width": 1080, "height": 1920 },
+  "theme": { "accent": "#d97757", "bg": "#1f1a17", "fg": "#fbf6f2" },
+  "targetSeconds": 30,
+  "maxStill": 0,
+  "bpm": 120,
+  "intro": { "kicker": "Opia 5.5", "title": "Your desktop pet just got a *job*" },
+  "scenes": [
+    { "caption": "Just *ask* Opia", "steps": [
+      { "goto": "/", "pause": 200 },
+      { "eval": "reel.ask()", "pause": 0 }
+    ]},
+    { "caption": "It works in *your* tabs", "hold": 200, "steps": [
+      { "eval": "reel.fill()", "pause": 0 }
+    ]},
+    { "caption": "Keep *gaming*. Opia keeps working", "hold": 200, "steps": [
+      { "eval": "reel.gaming()", "pause": 0 }
+    ]},
+    { "caption": "Fling it. It *bounces*", "hold": 200, "steps": [
+      { "eval": "reel.fling()", "pause": 0 }
+    ]},
+    { "caption": "It *never* spends your money", "hold": 300, "steps": [
+      { "eval": "reel.noPay()", "pause": 0 }
+    ]}
+  ],
+  "outro": { "kicker": "Free · open source · runs on Claude Code", "title": "Meet *Opia* 5.5", "cta": "github.com/samuelsortland-cmyk/opia" }
+}
