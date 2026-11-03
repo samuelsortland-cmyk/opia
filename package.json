@@ -1,0 +1,45 @@
+{
+  "name": "opia",
+  "productName": "Opia 5.5",
+  "version": "5.5.1",
+  "description": "Opia 5.5 \u2014 a jittery pixel desktop pet that does things on your computer with Claude Code.",
+  "main": "main/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "check": "node -e \"for (const f of require('fs').readdirSync('main')) if (f.endsWith('.js')) require('child_process').execFileSync(process.execPath, ['--check', 'main/' + f], {stdio: 'inherit'})\"",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@playwright/mcp": "^0.0.84"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "build": {
+    "appId": "dev.opia.pet",
+    "productName": "Opia 5.5",
+    "files": [
+      "main/**",
+      "renderer/**",
+      "assets/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "asarUnpack": [
+      "main/tools/**",
+      "node_modules/@playwright/**",
+      "node_modules/playwright*/**"
+    ]
+  }
+}

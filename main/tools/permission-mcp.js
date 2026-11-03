@@ -1,0 +1,186 @@
+#!/usr/bin/env node
+'use strict';
+// Opia bridge: a tiny, dependency-free stdio MCP server with two tools.
+//
+// `see_screen` returns a screenshot of the user's screen (the display under their cursor),
+// fetched from Opia's localhost HTTP server, so Claude can see what the user is looking at.
+//
+// Claude Code calls the `approve` tool (via --permission-prompt-tool mcp__opia__approve)
+// whenever a tool needs permission. We forward the request to Opia's localhost HTTP
+// server (inside agent.js) and return its decision as the text JSON Claude Code expects:
+//   {"behavior":"allow","updatedInput":{...}}  or  {"behavior":"deny","message":"..."}
+//
+// Env: OPIA_PERM_URL (e.g. http://127.0.0.1:12345/approve), OPIA_SCREEN_URL, OPIA_PERM_TOKEN.
+// Protocol: JSON-RPC 2.0, one message per line on stdin/stdout. Logs go to stderr only.
+
+const URL_ = process.env.OPIA_PERM_URL;
+const SCREEN_URL = process.env.OPIA_SCREEN_URL;
+const TOKEN = process.env.OPIA_PERM_TOKEN || '';
+const http = require('http');
+
+const TOOL = {
+  name: 'approve',
+  description: 'Ask the Opia desktop pet user whether a tool call may run.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      tool_name: { type: 'string', description: 'Name of the tool asking for permission' },
+      input: { type: 'object', description: 'Input the tool will run with' },
+      tool_use_id: { type: 'string' },
+    },
+    required: ['tool_name', 'input'],
+  },
+};
+
+const SCREEN_TOOL = {
+  name: 'see_screen',
+  description: 'Take a screenshot of the user\'s screen (the display under their mouse cursor) and look at it. ' +
+    'Use this whenever the user refers to what is on their screen ("this", "this page", "this question", "what I\'m looking at"), ' +
+    'or when seeing their screen would help. It is a still image; call it again for a fresh view. Opia\'s own windows are hidden from it.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      display: { type: 'string', enum: ['cursor', 'primary'], description: 'Which display: the one under the cursor (default) or the primary one.' },
+    },
+  },
+};
+
+function postJson(urlStr, payload) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(urlStr); } catch { return reject(new Error('Opia bridge is not configured.')); }
+    const body = JSON.stringify(payload || {});
+    const req = http.request({
+      hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), 'x-opia-token': TOKEN },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { reject(new Error('Opia returned an unreadable answer.')); }
+      });
+    });
+    req.on('error', (e) => reject(new Error('Opia is not reachable: ' + e.message)));
+    req.end(body);
+  });
+}
+
+async function seeScreen(args) {
+  if (!SCREEN_URL) return { content: [{ type: 'text', text: 'Screen access is not set up in this Opia.' }], isError: true };
+  try {
+    const r = await postJson(SCREEN_URL, args || {});
+    if (!r || r.error || !r.data) return { content: [{ type: 'text', text: (r && r.error) || 'Could not capture the screen.' }], isError: true };
+    const info = `Screenshot of the user's screen (${r.width}x${r.height}${r.displays > 1 ? `, display ${r.displayIndex + 1} of ${r.displays}` : ''}).` +
+      (r.cursor ? ` Their mouse cursor is at about (${r.cursor.x}, ${r.cursor.y}) in this image.` : '') +
+      (r.note ? ' ' + r.note : '');
+    return { content: [{ type: 'image', data: r.data, mimeType: r.mimeType || 'image/jpeg' }, { type: 'text', text: info }] };
+  } catch (e) {
+    return { content: [{ type: 'text', text: e.message }], isError: true };
+  }
+}
+
+function send(msg) {
+  process.stdout.write(JSON.stringify(msg) + '\n');
+}
+
+function log(...a) {
+  process.stderr.write('[opia-perm] ' + a.join(' ') + '\n');
+}
+
+function ask(args) {
+  return new Promise((resolve) => {
+    const deny = (message) => resolve({ behavior: 'deny', message });
+    if (!URL_) return deny('Opia permission bridge is not configured.');
+    let u;
+    try { u = new URL(URL_); } catch { return deny('Bad OPIA_PERM_URL.'); }
+    const body = JSON.stringify({
+      tool_name: args.tool_name,
+      input: args.input || {},
+      tool_use_id: args.tool_use_id || null,
+    });
+    const req = http.request({
+      hostname: u.hostname,
+      port: u.port,
+      path: u.pathname,
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(body),
+        'x-opia-token': TOKEN,
+      },
+    }, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => {
+        try {
+          const d = JSON.parse(data);
+          if (d && d.behavior === 'allow') {
+            resolve({ behavior: 'allow', updatedInput: d.updatedInput || args.input || {} });
+          } else {
+            deny((d && d.message) || 'The user denied this action.');
+          }
+        } catch {
+          deny('Opia returned an unreadable permission answer.');
+        }
+      });
+    });
+    req.on('error', (e) => { log('request failed:', e.message); deny('Opia is not reachable to approve this.'); });
+    req.end(body);
+  });
+}
+
+async function handle(msg) {
+  const { id, method, params } = msg;
+  const isRequest = id !== undefined && id !== null;
+  switch (method) {
+    case 'initialize':
+      return isRequest && send({
+        jsonrpc: '2.0', id,
+        result: {
+          protocolVersion: (params && params.protocolVersion) || '2024-11-05',
+          capabilities: { tools: {} },
+          serverInfo: { name: 'opia', version: '5.5.0' },
+        },
+      });
+    case 'ping':
+      return isRequest && send({ jsonrpc: '2.0', id, result: {} });
+    case 'tools/list':
+      return send({ jsonrpc: '2.0', id, result: { tools: [TOOL, SCREEN_TOOL] } });
+    case 'tools/call': {
+      const name = params && params.name;
+      if (name === 'see_screen') {
+        return send({ jsonrpc: '2.0', id, result: await seeScreen((params && params.arguments) || {}) });
+      }
+      if (name !== 'approve') {
+        return send({ jsonrpc: '2.0', id, error: { code: -32602, message: `Unknown tool: ${name}` } });
+      }
+      const decision = await ask((params && params.arguments) || {});
+      return send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(decision) }] } });
+    }
+    default:
+      if (isRequest) send({ jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${method}` } });
+  }
+}
+
+let buf = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => {
+  buf += chunk;
+  let i;
+  while ((i = buf.indexOf('\n')) >= 0) {
+    const line = buf.slice(0, i).trim();
+    buf = buf.slice(i + 1);
+    if (!line) continue;
+    let msg;
+    try { msg = JSON.parse(line); } catch {
+      send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+      continue;
+    }
+    handle(msg).catch((e) => {
+      log('handler error:', e && e.message);
+      if (msg.id !== undefined) send({ jsonrpc: '2.0', id: msg.id, error: { code: -32603, message: String(e && e.message) } });
+    });
+  }
+});
+process.stdin.on('end', () => process.exit(0));

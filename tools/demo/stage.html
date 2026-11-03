@@ -1,0 +1,245 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Opia 5.5 demo stage</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1280px; height: 720px; overflow: hidden; background: #111; font-family: -apple-system, "Segoe UI", Inter, Roboto, sans-serif; }
+  #desktop { position: absolute; inset: 0; background:
+      radial-gradient(1200px 600px at 75% 15%, #f3b38f 0%, rgba(243,179,143,0) 60%),
+      radial-gradient(900px 700px at 10% 100%, #3b4a7a 0%, rgba(59,74,122,0) 70%),
+      linear-gradient(160deg, #2a2f52 0%, #6b4b6e 45%, #d98c6a 100%); }
+  .icon { position: absolute; left: 28px; width: 76px; text-align: center; color: #fff; font-size: 12px; text-shadow: 0 1px 2px #0008; }
+  .icon i { display: block; width: 52px; height: 44px; margin: 0 auto 6px; border-radius: 9px; background: #ffffffd0; box-shadow: 0 2px 8px #0004; }
+  .icon i.folder { background: linear-gradient(#8fc3ff, #4b8fe0); border-radius: 6px 6px 9px 9px; }
+  .icon i.doc { width: 40px; background: #fff; }
+  .icon i.trash { width: 40px; background: linear-gradient(#ddd, #aaa); border-radius: 4px 4px 10px 10px; }
+  #taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: #161826d9; backdrop-filter: blur(8px); display: flex; align-items: center; gap: 10px; padding: 0 14px; color: #ddd; font-size: 13px; z-index: 5; }
+  #taskbar .app { width: 26px; height: 26px; border-radius: 7px; background: #ffffff22; }
+  #taskbar .app.on { background: #ffffff55; }
+  #taskbar .clock { margin-left: auto; }
+  #newfile { position: absolute; left: 28px; top: 330px; opacity: 0; transition: opacity .6s, transform .6s; transform: scale(.6); }
+  #newfile.show { opacity: 1; transform: scale(1); }
+
+  #game { position: absolute; inset: 0; display: none; z-index: 6; }
+  #game canvas { width: 100%; height: 100%; display: block; }
+
+  #browser { position: absolute; left: 24px; top: 40px; width: 600px; height: 450px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 18px 50px #0008; display: none; z-index: 7; transition: all .7s cubic-bezier(.2,.8,.2,1); }
+  #browser.mini { left: 24px; top: 24px; width: 420px; height: 300px; z-index: 9; outline: 3px solid #D87556; }
+  #browser .tabs { height: 34px; background: #dee1e6; display: flex; align-items: flex-end; padding: 0 8px; gap: 4px; }
+  #browser .tab { height: 28px; padding: 6px 14px; font-size: 12px; color: #444; border-radius: 8px 8px 0 0; white-space: nowrap; }
+  #browser .tab.on { background: #fff; color: #111; }
+  #browser .tab.on::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #D87556; margin-right: 6px; }
+  #browser .url { height: 36px; display: flex; align-items: center; padding: 0 10px; gap: 8px; border-bottom: 1px solid #e3e3e3; }
+  #browser .url span { flex: 1; background: #f1f3f4; border-radius: 16px; padding: 6px 14px; font-size: 13px; color: #333; }
+  #browser .dbg { background: #fff8d6; color: #5c4a00; font-size: 12px; padding: 6px 12px; border-bottom: 1px solid #eedc8a; }
+  #browser .page { position: relative; height: calc(100% - 100px); overflow: hidden; }
+  .pg { position: absolute; inset: 0; padding: 22px 28px; opacity: 0; transition: opacity .4s; color: #222; }
+  .pg.on { opacity: 1; }
+  .pg h1 { margin: 0 0 6px; font-size: 24px; }
+  .pg .sub { color: #666; font-size: 13px; margin-bottom: 16px; }
+  .search { display: flex; gap: 8px; margin: 26px 0; }
+  .search .in { flex: 1; border: 2px solid #ccd; border-radius: 10px; padding: 10px 14px; font-size: 16px; min-height: 44px; }
+  .btn { background: #2f6fde; color: #fff; border-radius: 10px; padding: 10px 18px; font-size: 15px; display: inline-block; }
+  .days { display: flex; gap: 12px; }
+  .day { flex: 1; border-radius: 12px; background: #f0f5ff; padding: 14px; text-align: center; font-size: 14px; }
+  .day b { display: block; font-size: 28px; margin: 6px 0; }
+  .chips { display: flex; gap: 8px; margin-bottom: 14px; }
+  .chip { padding: 6px 12px; border-radius: 16px; background: #eef; font-size: 13px; }
+  .chip.on { background: #2f6fde; color: #fff; }
+  .ring { position: absolute; border: 3px solid #D87556; border-radius: 12px; box-shadow: 0 0 0 6px #D8755633; pointer-events: none; opacity: 0; transition: all .35s; z-index: 3; }
+  .ring.on { opacity: 1; }
+
+  iframe { position: absolute; border: 0; background: transparent; }
+  #pet { width: 300px; height: 300px; z-index: 20; }
+  #panel { width: 400px; height: 600px; z-index: 19; border-radius: 14px; box-shadow: 0 18px 50px #0009; opacity: 0; transform: translateY(14px) scale(.98); transition: opacity .3s, transform .3s; pointer-events: none; }
+  #panel.open { opacity: 1; transform: none; pointer-events: auto; }
+
+  #toast { position: absolute; right: 18px; top: 18px; width: 340px; background: #1f2130f2; color: #eee; border-radius: 12px; padding: 12px 14px; font-size: 13px; z-index: 25; box-shadow: 0 10px 30px #0008; display: flex; gap: 12px; transform: translateX(380px); transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+  #toast.show { transform: none; }
+  #toast img { width: 40px; height: 40px; image-rendering: pixelated; }
+  #toast b { display: block; color: #fff; margin-bottom: 2px; }
+
+  #caption { position: absolute; left: 24px; bottom: 56px; max-width: 600px; z-index: 40; background: #101220e6; color: #fff; padding: 12px 22px; border-radius: 14px; font-size: 22px; font-weight: 600; letter-spacing: .2px; opacity: 0; transition: opacity .4s; box-shadow: 0 8px 30px #0007; }
+  #caption.show { opacity: 1; }
+  #caption small { display: block; font-size: 15px; font-weight: 400; color: #f0c2ad; margin-top: 4px; }
+  #badge { position: absolute; right: 12px; bottom: 46px; z-index: 40; color: #fff9; font-size: 11px; background: #0006; padding: 3px 8px; border-radius: 6px; }
+
+  #card { position: absolute; inset: 0; z-index: 50; background: radial-gradient(circle at 50% 40%, #3a2f45, #141320); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity .8s; }
+  #card.hide { opacity: 0; pointer-events: none; }
+  #card img { width: 260px; image-rendering: pixelated; margin-bottom: 18px; }
+  #card h1 { font-size: 64px; margin: 0; letter-spacing: 1px; }
+  #card h1 span { color: #D87556; }
+  #card p { font-size: 22px; color: #e9c7b8; margin: 10px 0 0; }
+
+  #cursor { position: absolute; z-index: 60; width: 22px; height: 30px; pointer-events: none; transform: translate(-2px, -2px); filter: drop-shadow(0 1px 2px #0009); }
+  #cursor.grab path { fill: #ffe3d6; }
+</style></head>
+<body>
+<div id="desktop">
+  <div class="icon" style="top:30px"><i class="folder"></i>Documents</div>
+  <div class="icon" style="top:120px"><i class="folder"></i>Downloads</div>
+  <div class="icon" style="top:210px"><i class="trash"></i>Trash</div>
+  <div class="icon" id="newfile"><i class="doc"></i>oslo-weekend.txt</div>
+</div>
+
+<div id="game"><canvas id="gc" width="1280" height="720"></canvas></div>
+
+<div id="browser">
+  <div class="tabs"><div class="tab">📧 Inbox (3)</div><div class="tab on" id="tabTitle">SkyCast Weather</div><div class="tab">🎵 Lo-fi radio</div></div>
+  <div class="url"><span id="url">skycast.example/</span></div>
+  <div class="dbg">🎭 “Playwright Extension” is controlling this tab for Opia 5.5</div>
+  <div class="page">
+    <div class="pg on" id="pg0"><h1>☁ SkyCast</h1><div class="sub">Forecasts for anywhere</div>
+      <div class="search"><div class="in" id="typed"></div><div class="btn" id="go">Search</div></div>
+      <div class="sub">Popular: London · Tokyo · New York</div></div>
+    <div class="pg" id="pg1"><h1>Oslo, Norway</h1><div class="sub">Updated just now</div>
+      <div class="chips"><div class="chip">Today</div><div class="chip">Hourly</div><div class="chip" id="wk">Weekend</div><div class="chip">10-day</div></div>
+      <div class="days" id="days"><div class="day">Today<b>3°</b>☁ Cloudy</div><div class="day">Tomorrow<b>2°</b>🌧 Rain</div></div></div>
+    <div class="pg" id="pg2"><h1>Oslo · This weekend</h1><div class="sub">Sat 7 – Sun 8 Nov</div>
+      <div class="chips"><div class="chip">Today</div><div class="chip">Hourly</div><div class="chip on">Weekend</div><div class="chip">10-day</div></div>
+      <div class="days"><div class="day">Saturday<b>4°</b>🌨 Light snow</div><div class="day">Sunday<b>6°</b>☀ Sunny</div></div></div>
+    <div class="ring" id="ring"></div>
+  </div>
+</div>
+
+<iframe id="panel" src="/renderer/panel.html"></iframe>
+<iframe id="pet" src="/renderer/index.html" allowtransparency="true"></iframe>
+
+<div id="toast"><canvas id="toastSprite" width="44" height="44" style="width:44px;height:44px;image-rendering:pixelated"></canvas><div><b>Opia 5.5</b><span id="toastText"></span></div></div>
+<div id="taskbar"><div class="app on"></div><div class="app"></div><div class="app" id="tbGame"></div><div class="app"></div><span class="clock">Sat 10:42</span></div>
+<div id="caption"></div>
+<div id="badge">Real Opia sprite, animation &amp; UI · agent steps scripted for this demo</div>
+<div id="card"><canvas id="cardSprite" width="300" height="270" style="width:300px;height:270px;image-rendering:pixelated;margin-bottom:6px"></canvas><h1>Opia <span>5.5</span></h1><p>a jittery little desktop agent, in a top hat</p></div>
+<svg id="cursor" viewBox="0 0 22 30"><path d="M2 2 L2 24 L8 18 L12 28 L16 26 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>
+
+<script src="/renderer/sprite.js"></script>
+<script>
+(function () {
+  var W = 1280, H = 720, TASKBAR = 40, P = 300;
+  var petEl = document.getElementById('pet'), panelEl = document.getElementById('panel');
+  var pos = { x: W - P - 20, y: H - TASKBAR - P };
+  var cursor = { x: 640, y: 360 };
+  var listeners = [];
+  var panelOpen = false;
+  function place() { petEl.style.left = pos.x + 'px'; petEl.style.top = pos.y + 'px'; }
+  place();
+  function placePanel() {
+    var x = pos.x - 400 + 30; if (x < 0) x = pos.x + P - 20;
+    var y = Math.max(8, Math.min(pos.y + P - 600 - 20, H - TASKBAR - 600));
+    panelEl.style.left = x + 'px'; panelEl.style.top = y + 'px';
+  }
+  var hub = window.__stage = {
+    moveBy: function (dx, dy) {
+      pos.x = Math.max(0, Math.min(W - P, pos.x + dx));
+      pos.y = Math.max(0, Math.min(H - TASKBAR - P, pos.y + dy));
+      place(); if (panelOpen) placePanel();
+    },
+    getBounds: function () { return { x: pos.x, y: pos.y, width: P, height: P }; },
+    getWorkArea: function () { return { x: 0, y: 0, width: W, height: H - TASKBAR }; },
+    getCursor: function () { return { x: Math.round(cursor.x), y: Math.round(cursor.y) }; },
+    cursorAt: function (x, y) { cursor.x = x; cursor.y = y; drawCursor(); },
+    onAgentEvent: function (cb) { listeners.push(cb); return function () {}; },
+    emit: function (ev) { listeners.forEach(function (cb) { try { cb(ev); } catch (e) { console.error(e); } }); },
+    togglePanel: function () { panelOpen ? hub.hidePanel() : hub.showPanel(); },
+    showPanel: function () { panelOpen = true; placePanel(); panelEl.classList.add('open'); hub.emit({ type: 'panel', open: true }); },
+    hidePanel: function () { panelOpen = false; panelEl.classList.remove('open'); hub.emit({ type: 'panel', open: false }); },
+    prompts: [], permissions: [],
+    sendPrompt: function (t) { hub.prompts.push(t); },
+    respondPermission: function (id, allow) { hub.permissions.push({ id: id, allow: allow }); hub.emit({ type: 'permission-resolved', id: id, allow: allow }); },
+    setPos: function (x, y) { pos.x = x; pos.y = y; place(); },
+  };
+  var cur = document.getElementById('cursor');
+  function drawCursor() { cur.style.left = cursor.x + 'px'; cur.style.top = cursor.y + 'px'; }
+  drawCursor();
+  document.addEventListener('mousemove', function (e) { hub.cursorAt(e.clientX, e.clientY); }, true);
+
+  // ---- demo helpers
+  var cap = document.getElementById('caption');
+  window.caption = function (t, sub) {
+    if (!t) { cap.classList.remove('show'); return; }
+    cap.innerHTML = t + (sub ? '<small>' + sub + '</small>' : '');
+    cap.classList.add('show');
+  };
+  window.card = function (show, title, sub) {
+    var c = document.getElementById('card');
+    if (title) c.querySelector('h1').innerHTML = title;
+    if (sub != null) c.querySelector('p').textContent = sub;
+    c.classList.toggle('hide', !show);
+  };
+  window.toast = function (t) {
+    document.getElementById('toastText').textContent = t;
+    var el = document.getElementById('toast'); el.classList.add('show');
+    setTimeout(function () { el.classList.remove('show'); }, 4200);
+  };
+  var br = document.getElementById('browser');
+  window.browser = function (show, mini) { br.style.display = show ? 'block' : 'none'; br.classList.toggle('mini', !!mini); };
+  window.page = function (n, url, title) {
+    if (title) document.querySelector('#pg' + n + ' h1').textContent = title;
+    [0, 1, 2].forEach(function (i) { document.getElementById('pg' + i).classList.toggle('on', i === n); });
+    if (url) document.getElementById('url').textContent = url;
+  };
+  window.ring = function (id) {
+    var r = document.getElementById('ring');
+    if (!id) { r.classList.remove('on'); return; }
+    var el = document.getElementById(id), p = el.closest('.page').getBoundingClientRect(), b = el.getBoundingClientRect();
+    var s = br.classList.contains('mini') ? 420 / 600 : 1;
+    r.style.left = ((b.left - p.left) / s - 6) + 'px'; r.style.top = ((b.top - p.top) / s - 6) + 'px';
+    r.style.width = (b.width / s + 12) + 'px'; r.style.height = (b.height / s + 12) + 'px';
+    r.classList.add('on');
+  };
+  window.typeInto = function (text, ms) {
+    var el = document.getElementById('typed'), i = 0; el.textContent = '';
+    var t = setInterval(function () { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(t); }, ms || 70);
+  };
+  window.showFile = function () { document.getElementById('newfile').classList.add('show'); };
+
+  // ---- a small generic block-world game for the "you keep playing" scene
+  var gameOn = false;
+  window.game = function (on) {
+    gameOn = on; document.getElementById('game').style.display = on ? 'block' : 'none';
+    document.getElementById('tbGame').classList.toggle('on', on);
+    if (on) requestAnimationFrame(loop);
+  };
+  var g = document.getElementById('gc').getContext('2d');
+  var hero = { x: 300, y: 0, vy: 0 }, scroll = 0, t0 = performance.now(), score = 0, coins = [];
+  for (var i = 0; i < 40; i++) coins.push({ x: 500 + i * 220 + (i % 3) * 40, y: 380 - (i % 4) * 50, got: false });
+  function groundY(x) { return 520 - Math.round(Math.sin(x / 260) * 2) * 40 - (Math.floor(x / 600) % 3 === 2 ? 40 : 0); }
+  function loop(now) {
+    if (!gameOn) return;
+    var dt = Math.min(50, now - t0); t0 = now;
+    scroll += dt * 0.22;
+    var hx = scroll + hero.x, gy = groundY(hx);
+    if (hero.y >= gy - 48 && Math.random() < 0.02) hero.vy = -13;
+    hero.vy += 0.7; hero.y += hero.vy;
+    if (hero.y > gy - 48) { hero.y = gy - 48; hero.vy = 0; }
+    var sky = g.createLinearGradient(0, 0, 0, 720); sky.addColorStop(0, '#5fb4ff'); sky.addColorStop(1, '#bfe6ff');
+    g.fillStyle = sky; g.fillRect(0, 0, 1280, 720);
+    g.fillStyle = '#ffffffd0';
+    for (var c = 0; c < 6; c++) { var cx = ((c * 300 - scroll * 0.3) % 1600 + 1600) % 1600 - 160; g.fillRect(cx, 80 + (c % 3) * 40, 120, 30); g.fillRect(cx + 30, 60 + (c % 3) * 40, 60, 30); }
+    for (var x = -(scroll % 40); x < 1280; x += 40) {
+      var wx = x + scroll, top = groundY(wx);
+      g.fillStyle = '#4caf50'; g.fillRect(x, top, 40, 14);
+      g.fillStyle = '#8d6e4a'; g.fillRect(x, top + 14, 40, 720 - top);
+      g.strokeStyle = '#00000022'; g.strokeRect(x + .5, top + .5, 40, 720 - top);
+    }
+    coins.forEach(function (k) {
+      var sx = k.x - scroll; if (sx < -30 || sx > 1300 || k.got) return;
+      if (Math.abs(sx - hero.x - 16) < 30 && Math.abs(k.y - hero.y - 20) < 40) { k.got = true; score += 10; }
+      g.fillStyle = '#ffd23f'; g.fillRect(sx - 10, k.y - 10, 20, 20); g.fillStyle = '#e0a800'; g.fillRect(sx - 4, k.y - 6, 8, 12);
+    });
+    g.fillStyle = '#3b6fd8'; g.fillRect(hero.x, hero.y + 20, 32, 28);
+    g.fillStyle = '#ffcc99'; g.fillRect(hero.x + 4, hero.y, 24, 22);
+    g.fillStyle = '#222'; g.fillRect(hero.x + 18, hero.y + 8, 4, 4);
+    g.fillStyle = '#0008'; g.fillRect(20, 20 + 0, 0, 0);
+    g.fillStyle = '#000a'; g.fillRect(1100, 20, 160, 44);
+    g.fillStyle = '#fff'; g.font = 'bold 22px sans-serif'; g.fillText('⭐ ' + score, 1120, 50);
+    requestAnimationFrame(loop);
+  }
+  try {
+    var cs = window.OpiaSprite.create(document.getElementById('cardSprite'), { scale: 6 });
+    cs.draw({ mood: 'idle' });
+    var ts = window.OpiaSprite.create(document.getElementById('toastSprite'), { scale: 1 });
+    ts.draw({ mood: 'success' });
+  } catch (e) { console.error('card sprite', e); }
+})();
+</script>
+</body></html>

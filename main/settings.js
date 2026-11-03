@@ -1,0 +1,79 @@
+'use strict';
+// Opia 5.5 settings: a small JSON file in the app's userData folder.
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const DEFAULTS = Object.freeze({
+  permissionMode: 'ask', // 'ask' | 'auto'
+  browserHeadless: true, // invisible by default so no window ever pops up over a game
+  cwd: os.homedir(),
+  claudePath: 'claude',
+  model: '',
+  browser: '', // '' = auto-detect installed Edge/Chrome/Brave/Chromium (Edge first) | 'chrome' | 'msedge' | 'chromium' | 'firefox'
+  browserPath: '', // optional explicit browser executable; overrides `browser`
+  browserMode: 'separate', // 'separate' = Opia's own browser (no setup) | 'mine' = your open Chrome/Edge tab (needs the Playwright Extension)
+  extensionToken: '', // PLAYWRIGHT_MCP_EXTENSION_TOKEN from the Playwright Extension (skips the connect dialog)
+  browserProfile: '', // optional Chrome profile dir name for extension mode, e.g. "Profile 1"
+  quiet: true, // never take keyboard focus on its own (safe while gaming)
+  screenAccess: true, // let Opia take screenshots of your screen (see_screen tool)
+  autoUpdateCheck: true, // check GitHub for a new version at startup and every few hours
+  updateRepo: 'samuelsortland-cmyk/opia',
+  updateBranch: 'main',
+  updatePath: '', // folder inside the repo that holds Opia ('' = the repo root)
+  updateToken: '', // optional read-only GitHub token, needed only if the repo is private
+});
+
+class Settings {
+  constructor(userDataDir) {
+    this.file = path.join(userDataDir, 'opia-settings.json');
+    this.data = { ...DEFAULTS };
+    try {
+      const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      this.data = { ...DEFAULTS, ...sanitize(raw) };
+      // Opia moved from the claude-team repo to its own repo: follow it.
+      if (this.data.updateRepo === 'samuelsortland-cmyk/claude-team') {
+        Object.assign(this.data, { updateRepo: DEFAULTS.updateRepo, updateBranch: DEFAULTS.updateBranch, updatePath: DEFAULTS.updatePath });
+      }
+    } catch (_) { /* first run or broken file: keep defaults */ }
+  }
+
+  get() {
+    return { ...this.data };
+  }
+
+  set(partial) {
+    this.data = { ...this.data, ...sanitize(partial || {}) };
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+    } catch (err) {
+      console.error('[opia] could not save settings:', err.message);
+    }
+    return this.get();
+  }
+}
+
+function sanitize(obj) {
+  const out = {};
+  if (obj.permissionMode === 'ask' || obj.permissionMode === 'auto') out.permissionMode = obj.permissionMode;
+  if (typeof obj.browserHeadless === 'boolean') out.browserHeadless = obj.browserHeadless;
+  if (typeof obj.cwd === 'string' && obj.cwd.trim()) out.cwd = obj.cwd.trim();
+  if (typeof obj.claudePath === 'string' && obj.claudePath.trim()) out.claudePath = obj.claudePath.trim();
+  if (typeof obj.model === 'string') out.model = obj.model.trim();
+  if (['', 'chrome', 'msedge', 'chromium', 'firefox'].includes(obj.browser)) out.browser = obj.browser;
+  if (typeof obj.browserPath === 'string') out.browserPath = obj.browserPath.trim();
+  if (['mine', 'separate'].includes(obj.browserMode)) out.browserMode = obj.browserMode;
+  if (typeof obj.extensionToken === 'string') out.extensionToken = obj.extensionToken.trim();
+  if (typeof obj.browserProfile === 'string') out.browserProfile = obj.browserProfile.trim();
+  if (typeof obj.quiet === 'boolean') out.quiet = obj.quiet;
+  if (typeof obj.screenAccess === 'boolean') out.screenAccess = obj.screenAccess;
+  if (typeof obj.autoUpdateCheck === 'boolean') out.autoUpdateCheck = obj.autoUpdateCheck;
+  if (typeof obj.updateRepo === 'string') out.updateRepo = obj.updateRepo.trim();
+  if (typeof obj.updateBranch === 'string') out.updateBranch = obj.updateBranch.trim();
+  if (typeof obj.updatePath === 'string') out.updatePath = obj.updatePath.trim().replace(/^\/+|\/+$/g, '');
+  if (typeof obj.updateToken === 'string') out.updateToken = obj.updateToken.trim();
+  return out;
+}
+
+module.exports = { Settings, DEFAULTS };

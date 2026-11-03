@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>Opia 5.5</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header id="titlebar">
+    <img id="logo" src="../assets/opia-base.png" alt="">
+    <div class="title">
+      <strong>Opia 5.5</strong>
+      <span id="state-line">idle</span>
+    </div>
+    <div class="spacer"></div>
+    <button id="btn-new" class="icon" title="New chat">＋</button>
+    <button id="btn-settings" class="icon" title="Settings">⚙</button>
+    <button id="btn-close" class="icon" title="Hide (Opia keeps working)">✕</button>
+  </header>
+
+  <section id="setup" hidden>
+    <h3>Opia needs Claude Code to think</h3>
+    <p id="setup-detail"></p>
+    <ol>
+      <li>Install it: <code>npm install -g @anthropic-ai/claude-code</code></li>
+      <li>Log in once: run <code>claude</code> in a terminal and follow the prompts</li>
+      <li>If it's installed somewhere unusual, set <em>Claude path</em> in ⚙ settings</li>
+    </ol>
+    <button id="btn-recheck">Check again</button>
+  </section>
+
+  <section id="settings" hidden>
+    <h3>Settings</h3>
+    <label class="row">
+      <span>Permissions</span>
+      <select id="set-permissionMode">
+        <option value="ask">Ask me before shell/file changes</option>
+        <option value="auto">Auto-approve everything (risky)</option>
+      </select>
+    </label>
+    <label class="row">
+      <span>Where Opia browses</span>
+      <select id="set-browserMode">
+        <option value="separate">Opia's own browser (no setup needed)</option>
+        <option value="mine">My browser: an existing tab (needs the Playwright Extension)</option>
+      </select>
+    </label>
+    <p class="hint">Opia's own browser needs no setup and remembers logins: to sign in to a site, untick "Hide Opia's browser", log in once in its window, then tick it again. "My browser" works in a tab you already have open, but needs the Playwright Extension in Chrome or Edge.</p>
+    <label class="row">
+      <span>Extension token (optional)</span>
+      <input type="password" id="set-extensionToken" spellcheck="false" placeholder="PLAYWRIGHT_MCP_EXTENSION_TOKEN">
+    </label>
+    <label class="row">
+      <span>Chrome profile (optional)</span>
+      <input type="text" id="set-browserProfile" spellcheck="false" placeholder="e.g. Profile 1">
+    </label>
+    <label class="row check">
+      <input type="checkbox" id="set-screenAccess">
+      <span>Let Opia see my screen (screenshots, only while it's working on a task)</span>
+    </label>
+    <label class="row check">
+      <input type="checkbox" id="set-quiet">
+      <span>Quiet mode: never pop up over what I'm doing (notifications only)</span>
+    </label>
+    <label class="row check">
+      <input type="checkbox" id="set-browserHeadless">
+      <span>Hide Opia's browser window (headless)</span>
+    </label>
+    <label class="row">
+      <span>Opia's browser</span>
+      <select id="set-browser">
+        <option value="">Auto (Edge first, then Chrome / Brave)</option>
+        <option value="chromium">Chromium (bundled)</option>
+        <option value="msedge">Edge</option>
+        <option value="firefox">Firefox</option>
+      </select>
+    </label>
+    <label class="row">
+      <span>Browser path (optional)</span>
+      <input type="text" id="set-browserPath" spellcheck="false" placeholder="auto">
+    </label>
+    <label class="row">
+      <span>Working folder</span>
+      <input type="text" id="set-cwd" spellcheck="false">
+    </label>
+    <label class="row">
+      <span>Claude path</span>
+      <input type="text" id="set-claudePath" spellcheck="false" placeholder="claude">
+    </label>
+    <label class="row">
+      <span>Model (optional)</span>
+      <input type="text" id="set-model" spellcheck="false" placeholder="default">
+    </label>
+    <h3>Updates</h3>
+    <div class="row update-row">
+      <span id="update-status">Not checked yet</span>
+      <button id="btn-update-check" type="button">Check now</button>
+      <button id="btn-update-apply" type="button" hidden>Update now</button>
+    </div>
+    <label class="row check">
+      <input type="checkbox" id="set-autoUpdateCheck">
+      <span>Check for updates automatically</span>
+    </label>
+    <label class="row">
+      <span>Update source (GitHub repo)</span>
+      <input type="text" id="set-updateRepo" spellcheck="false" placeholder="owner/repo">
+    </label>
+    <label class="row">
+      <span>Branch</span>
+      <input type="text" id="set-updateBranch" spellcheck="false" placeholder="main">
+    </label>
+    <label class="row">
+      <span>Folder in the repo</span>
+      <input type="text" id="set-updatePath" spellcheck="false" placeholder="(repo root)">
+    </label>
+    <label class="row">
+      <span>GitHub token (only for a private repo)</span>
+      <input type="password" id="set-updateToken" spellcheck="false" placeholder="github_pat_…">
+    </label>
+    <div class="row buttons">
+      <span id="settings-saved"></span>
+      <button id="btn-settings-save">Save</button>
+    </div>
+    <p class="hint">Hide, browser and path settings apply to Opia's own browser.</p>
+  </section>
+
+  <main id="log" aria-live="polite">
+    <div class="msg system">
+      Hi! I'm <b>Opia 5.5</b>, at your service 🎩🧐 Ask me to do something on your computer or the web.
+      I browse in my own invisible browser, without touching your mouse, keyboard or windows, so you can keep playing or working while I work.
+      <div class="examples">
+        <button class="example">Find the 3 top stories on Hacker News and summarize them</button>
+        <button class="example">What's taking up the most space in my Downloads folder?</button>
+        <button class="example">Check the weather for my city this weekend</button>
+      </div>
+    </div>
+  </main>
+
+  <footer id="composer">
+    <div id="queue-line" hidden></div>
+    <div class="inputwrap">
+      <textarea id="prompt" rows="2" placeholder="Ask Opia… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <button id="btn-send" title="Send">➤</button>
+      <button id="btn-stop" title="Stop" hidden>■</button>
+    </div>
+  </footer>
+
+  <script src="panel.js"></script>
+</body>
+</html>
