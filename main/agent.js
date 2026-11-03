@@ -183,6 +183,27 @@ function checkClaude(arg) {
 const PLAYWRIGHT_EXTENSION_ID = 'mmlmfjhmonkocbjadbfplnigmagldckm';
 
 /**
+ * Kill a spawned Claude Code process and everything it started (MCP servers, browsers, shells).
+ * Windows: claude runs under cmd.exe (shell: true), and killing cmd.exe alone would leave
+ * claude running, so kill the whole tree with taskkill right away. Elsewhere: SIGINT to the
+ * process group (claude ends the turn cleanly), then SIGKILL if anything is still alive.
+ */
+function killTree(child) {
+  const pid = child && child.pid;
+  if (!pid) return;
+  if (IS_WIN) {
+    try {
+      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+        .on('error', () => { try { child.kill(); } catch {} });
+    } catch { try { child.kill(); } catch {} }
+    return;
+  }
+  const sig = (s) => { try { process.kill(-pid, s); } catch { try { child.kill(s); } catch {} } };
+  sig('SIGINT');
+  setTimeout(() => sig('SIGKILL'), 1500).unref();
+}
+
+/**
  * Is the Playwright Extension installed in Edge or Chrome? Looks in each browser profile's
  * Extensions folder. Returns { installed, browser: 'msedge'|'chrome', profile, browsers: [...] }.
  */
@@ -486,7 +507,7 @@ class OpiaAgent extends EventEmitter {
     try {
       await this._ensureServer();
       let r = await this._runOnce(prompt, this.sessionId);
-      if (r.staleSession) {
+      if (r.staleSession && !this._cancelled) {
         this.sessionId = null;
         r = await this._runOnce(prompt, null);
       }
@@ -516,7 +537,8 @@ class OpiaAgent extends EventEmitter {
       const toolNames = new Map(); // tool_use_id -> name
       let browserHinted = false;
 
-      const finish = (r) => { if (!finished) { finished = true; resolve(r); } };
+      const finish = (r) => { if (!finished) { finished = true; if (this._finishRun === finish) this._finishRun = null; resolve(r); } };
+      this._finishRun = finish; // lets cancel() end this run immediately
 
       this._status('thinking', 'Ooh, a task! Let me think…');
 
@@ -548,7 +570,7 @@ class OpiaAgent extends EventEmitter {
       child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-8000); });
 
       const handle = (msg) => {
-        if (!msg || typeof msg !== 'object') return;
+        if (finished || !msg || typeof msg !== 'object') return; // a stopped run stays quiet
         if (msg.session_id && msg.type !== 'result') this.sessionId = msg.session_id;
 
         if (msg.type === 'system') {
@@ -661,26 +683,20 @@ class OpiaAgent extends EventEmitter {
   }
 
   /** Stop the current task: SIGINT (clean turn end), then SIGTERM, then SIGKILL on the process group. */
+  /** Stop the current task now: kill Claude Code and everything it started, and reset at once. */
   cancel() {
     this._cancelled = true;
     for (const done of this._pending.values()) done({ allow: false, message: 'The user stopped this task.' });
     const child = this._child;
-    if (!child || child.exitCode !== null) return;
-    this._status('thinking', 'Stopping…');
-    const kill = (sig) => {
-      if (child.exitCode !== null || child.signalCode) return;
-      try {
-        if (IS_WIN) {
-          if (sig === 'SIGINT') child.kill('SIGINT');
-          else spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
-        } else {
-          process.kill(-child.pid, sig);
-        }
-      } catch { try { child.kill(sig); } catch {} }
-    };
-    kill('SIGINT');
-    setTimeout(() => kill('SIGTERM'), 3000).unref();
-    setTimeout(() => kill('SIGKILL'), 7000).unref();
+    const running = !!(child && this._finishRun);
+    if (child) killTree(child);
+    if (running) {
+      // Don't wait for the processes to exit (a stuck browser or tool can take a while):
+      // report "stopped" and free Opia right away. Late output from the old run is ignored.
+      this._status('idle', 'Stopped. Standing by!');
+      this._emit({ type: 'done', result: '(stopped)', sessionId: this.sessionId, stopped: true });
+      this._finishRun({ ok: false, cancelled: true });
+    }
   }
 
   /** Call on app quit. */

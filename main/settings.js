@@ -22,6 +22,8 @@ const DEFAULTS = Object.freeze({
   updateBranch: 'main',
   updatePath: '', // folder inside the repo that holds Opia ('' = the repo root)
   updateToken: '', // optional read-only GitHub token, needed only if the repo is private
+  openAtLogin: false, // start Opia when you log in
+  shortcutsMade: false, // internal: Desktop/Start menu shortcuts were created once
   settingsVersion: 3,
 });
 
@@ -74,6 +76,8 @@ function sanitize(obj) {
   if (typeof obj.extensionToken === 'string') out.extensionToken = obj.extensionToken.trim();
   if (typeof obj.browserProfile === 'string') out.browserProfile = obj.browserProfile.trim();
   if (typeof obj.quiet === 'boolean') out.quiet = obj.quiet;
+  if (typeof obj.openAtLogin === 'boolean') out.openAtLogin = obj.openAtLogin;
+  if (typeof obj.shortcutsMade === 'boolean') out.shortcutsMade = obj.shortcutsMade;
   if (typeof obj.screenAccess === 'boolean') out.screenAccess = obj.screenAccess;
   if (typeof obj.autoUpdateCheck === 'boolean') out.autoUpdateCheck = obj.autoUpdateCheck;
   if (typeof obj.updateRepo === 'string') out.updateRepo = obj.updateRepo.trim();

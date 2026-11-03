@@ -9,6 +9,7 @@ const {
 } = require('electron');
 const { spawn } = require('child_process');
 const { LinkServer } = require('./link');
+const shortcuts = require('./shortcuts');
 const { Settings } = require('./settings');
 const { createPhysics } = require('./physics');
 const { createUpdater } = require('./updater');
@@ -25,6 +26,8 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('disable-gpu');
 }
 app.setName('Opia 5.5');
+// Windows ties notifications and taskbar grouping to this id (the shortcuts carry it too).
+if (process.platform === 'win32') app.setAppUserModelId(shortcuts.APP_ID);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -278,7 +281,16 @@ function rebuildTrayMenu() {
       label: 'Snooze wandering', type: 'checkbox', checked: wanderSnoozed,
       click: (item) => { wanderSnoozed = item.checked; broadcast({ type: 'wander', paused: wanderSnoozed }); },
     },
-    { label: 'Stop current task', click: () => agent && agent.cancel(), enabled: !!(agent && agent.busy) },
+    { label: 'Stop current task', click: () => stopTask(), enabled: !!(agent && agent.busy) },
+    { type: 'separator' },
+    {
+      label: 'Start Opia when I log in', type: 'checkbox', checked: shortcuts.getOpenAtLogin(app),
+      click: (item) => { settings.set({ openAtLogin: item.checked }); shortcuts.setOpenAtLogin(app, item.checked); },
+    },
+    ...(process.platform === 'win32' ? [{ label: 'Create desktop shortcut', click: () => {
+      const r = shortcuts.createShortcuts(app, shell);
+      notify(r.ok ? 'Shortcut created' : 'Could not create the shortcut', r.ok ? 'Opia 5.5 is on your Desktop and in the Start menu.' : (r.error || ''));
+    } }] : []),
     { type: 'separator' },
     updater && updater.state.state === 'available'
       ? { label: 'Update Opia now', click: () => updater.apply() }
@@ -327,6 +339,17 @@ function loadAgent() {
       rebuildTrayMenu();
     }
   });
+}
+
+/** Stop now: drop queued prompts, deny pending approvals, kill the running task. */
+function stopTask() {
+  const dropped = queue.length;
+  queue.length = 0;
+  broadcast({ type: 'queue', length: 0 });
+  for (const [id, p] of pendingPerms) { p.resolve({ allow: false, message: 'Cancelled by user' }); pendingPerms.delete(id); }
+  if (agent) agent.cancel();
+  rebuildTrayMenu();
+  return { ok: true, dropped };
 }
 
 async function runNext() {
@@ -388,15 +411,8 @@ function registerIpc() {
   ipcMain.on('panel:hide', hidePanel);
 
   ipcMain.handle('agent:prompt', (_e, text) => enqueuePrompt(text));
-  ipcMain.handle('agent:cancel', () => {
-    const dropped = queue.length;
-    queue.length = 0;
-    broadcast({ type: 'queue', length: 0 });
-    // Deny anything waiting for approval, so the CLI can wind down.
-    for (const [id, p] of pendingPerms) { p.resolve({ allow: false, message: 'Cancelled by user' }); pendingPerms.delete(id); }
-    if (agent) agent.cancel();
-    return { ok: true, dropped };
-  });
+  ipcMain.handle('agent:cancel', () => stopTask());
+  ipcMain.handle('app:shortcuts', () => shortcuts.createShortcuts(app, shell));
   ipcMain.handle('agent:newSession', () => {
     if (agent) agent.newSession();
     return { ok: true };
@@ -410,7 +426,11 @@ function registerIpc() {
   });
 
   ipcMain.handle('settings:get', () => settings.get());
-  ipcMain.handle('settings:set', (_e, partial) => settings.set(partial));
+  ipcMain.handle('settings:set', (_e, partial) => {
+    const r = settings.set(partial);
+    if (partial && typeof partial.openAtLogin === 'boolean') { shortcuts.setOpenAtLogin(app, partial.openAtLogin); rebuildTrayMenu(); }
+    return r;
+  });
   ipcMain.handle('claude:check', async () => {
     try { return await checkClaudeFn(settings.get()); } catch (err) { return { installed: false, error: err.message }; }
   });
@@ -459,6 +479,17 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
   registerIpc();
   loadAgent();
+  // Easy ways to open Opia: shortcuts on first run (refreshed if Opia moved), optional log-in start.
+  if (process.platform === 'win32' && !process.env.OPIA_SNAPSHOT_DIR) {
+    const first = !settings.get().shortcutsMade;
+    if (first || !shortcuts.shortcutsCurrent(app, shell)) {
+      const fs = require('fs');
+      const desk = path.join(app.getPath('desktop'), 'Opia 5.5.lnk');
+      shortcuts.createShortcuts(app, shell, { desktop: first || fs.existsSync(desk) });
+      settings.set({ shortcutsMade: true });
+    }
+  }
+  if (settings.get().openAtLogin) shortcuts.setOpenAtLogin(app, true);
   link = new LinkServer({ dataDir: app.getPath('userData'), extensionSrc: path.join(__dirname, '..', 'extension') });
   link.start().catch((err) => console.error('[opia] Opia Link:', err.message));
   link.on('status', (st) => {

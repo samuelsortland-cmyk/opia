@@ -98,6 +98,15 @@
       <span>Model (optional)</span>
       <input type="text" id="set-model" spellcheck="false" placeholder="default">
     </label>
+    <h3>Opening Opia</h3>
+    <label class="row check">
+      <input type="checkbox" id="set-openAtLogin">
+      <span>Start Opia when I log in</span>
+    </label>
+    <div class="row update-row">
+      <span id="shortcut-status">Opia adds itself to your Desktop and Start menu on Windows.</span>
+      <button id="btn-shortcuts" type="button">Create desktop shortcut</button>
+    </div>
     <h3>Updates</h3>
     <div class="row update-row">
       <span id="update-status">Not checked yet</span>
@@ -148,7 +157,7 @@
     <div class="inputwrap">
       <textarea id="prompt" rows="2" placeholder="Ask Opia… (Enter to send, Shift+Enter for a new line)"></textarea>
       <button id="btn-send" title="Send">➤</button>
-      <button id="btn-stop" title="Stop" hidden>■</button>
+      <button id="btn-stop" title="Stop now (Ctrl+.)" hidden>■</button>
     </div>
   </footer>
 

@@ -177,12 +177,13 @@
       case 'done': {
         endAssistantBubble();
         finishSteps();
+        if (ev.stopped) { setBusy(false); stateLine.textContent = 'stopped'; setTimeout(refreshState, 400); break; }
         const bits = [];
         if (ev.durationMs) bits.push(`${(ev.durationMs / 1000).toFixed(1)}s`);
         if (typeof ev.costUsd === 'number' && ev.costUsd > 0) bits.push(`~$${ev.costUsd.toFixed(3)}`);
         addMsg('meta', `✓ done${bits.length ? ' · ' + bits.join(' · ') : ''}`);
         stateLine.textContent = MOOD_LABEL.success;
-        refreshState();
+        setTimeout(refreshState, 300);
         break;
       }
       case 'error':
@@ -250,10 +251,19 @@
     if (e.key === 'Escape') opia.hidePanel();
   });
   sendBtn.addEventListener('click', () => send());
-  stopBtn.addEventListener('click', async () => {
+  async function stopNow() {
+    setBusy(false); // the UI resets right away; Opia kills the task in the background
+    endAssistantBubble();
+    finishSteps();
+    stateLine.textContent = 'stopped';
     const r = await opia.cancel();
-    addMsg('meta', `stopped${r && r.dropped ? ` · dropped ${r.dropped} queued task(s)` : ''}`);
-    refreshState();
+    addMsg('meta', `■ stopped${r && r.dropped ? ` · dropped ${r.dropped} queued task(s)` : ''}`);
+    setTimeout(refreshState, 400);
+  }
+  stopBtn.addEventListener('click', stopNow);
+  // Ctrl+. or Ctrl+Shift+X in the panel also stops.
+  document.addEventListener('keydown', (e) => {
+    if (busy && (e.ctrlKey || e.metaKey) && (e.key === '.' || (e.shiftKey && e.key.toLowerCase() === 'x'))) { e.preventDefault(); stopNow(); }
   });
   log.addEventListener('click', (e) => {
     const ex = e.target.closest('.example');
@@ -272,7 +282,7 @@
 
   // ------------------------------------------------------------ settings
 
-  const FIELDS = ['permissionMode', 'browserMode', 'extensionToken', 'browserProfile', 'screenAccess', 'quiet', 'autoUpdateCheck', 'updateRepo', 'updateBranch', 'updatePath', 'updateToken', 'browserHeadless', 'browser', 'browserPath', 'cwd', 'claudePath', 'model'];
+  const FIELDS = ['openAtLogin', 'permissionMode', 'browserMode', 'extensionToken', 'browserProfile', 'screenAccess', 'quiet', 'autoUpdateCheck', 'updateRepo', 'updateBranch', 'updatePath', 'updateToken', 'browserHeadless', 'browser', 'browserPath', 'cwd', 'claudePath', 'model'];
 
   async function loadSettings() {
     const s = await opia.getSettings();
@@ -373,6 +383,11 @@
     }
   }
   $('btn-ext-install').addEventListener('click', () => opia.installExtension());
+
+  $('btn-shortcuts').addEventListener('click', async () => {
+    const r = await opia.createShortcuts();
+    $('shortcut-status').textContent = r.ok ? '✓ Shortcut on your Desktop and in the Start menu.' : (r.error || 'Could not create the shortcut.');
+  });
 
   // ------------------------------------------------------------ updates
 

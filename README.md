@@ -21,19 +21,17 @@ A jittery little pixel desktop pet that **does things on your computer** for you
 
 ## Install & run
 
-Download Opia: https://github.com/samuelsortland-cmyk/opia/archive/refs/heads/main.zip, then unzip it. Or clone it:
-```bash
-git clone https://github.com/samuelsortland-cmyk/opia
-```
-Open a terminal in the unzipped or cloned folder (the one with `package.json`), then:
-```bash
-npm install
-```
-```bash
-npm start
-```
+1. Download Opia: https://github.com/samuelsortland-cmyk/opia/archive/refs/heads/main.zip and unzip it. Or clone it with `git clone https://github.com/samuelsortland-cmyk/opia`.
+2. **Windows:** double-click **`Start Opia.bat`** in the Opia folder. The first time, it installs what Opia needs (about a minute).
+   **Mac/Linux:** in a terminal in the Opia folder, run `npm install` once, then `npm start`.
+3. Opia appears in the bottom-right corner of your screen, with a tray/menu-bar icon.
 
-Opia appears in the bottom-right corner of your screen, and a tray/menu-bar icon appears with it.
+**Opening Opia later (Windows):**
+- On first start, Opia adds an **Opia 5.5** shortcut to your **Desktop** and **Start menu**. Double-click it, or press the Windows key and type "Opia".
+- If Opia is already running, the shortcut opens its panel.
+- Lost the shortcut? Use **tray → Create desktop shortcut**, or **Settings → Opening Opia**.
+- **Start Opia when I log in:** tray checkbox, or **Settings → Opening Opia**.
+- `Start Opia.bat` always works too.
 
 ## Using Opia
 
@@ -43,7 +41,7 @@ Opia appears in the bottom-right corner of your screen, and a tray/menu-bar icon
 | Type a task and press **Enter** | Opia thinks, browses, and works; progress shows in the panel and in Opia's speech bubble |
 | Close the panel (✕ or Esc) | **Opia keeps working in the background.** You get a notification when it's done or needs approval |
 | Send another task while busy | It is queued and runs next |
-| ■ Stop | Cancels the current task and clears the queue |
+| ■ Stop (or **Ctrl+.** in the panel, or **tray → Stop current task**) | Stops the current task **immediately**, even if it's stuck: Claude Code and everything it started (browser tools, commands) are shut down, and the queue is cleared |
 | ＋ New chat | Forgets the previous conversation (otherwise Opia remembers it with `--resume`) |
 | Drag Opia | Moves it. Let go and it falls to the bottom of the screen with gravity |
 | **Fling Opia** (drag fast and let go) | It flies, bounces off the screen edges and floor, and maybe gets dizzy. Click it mid-air to catch it |
