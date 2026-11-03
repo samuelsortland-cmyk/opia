@@ -1,0 +1,22 @@
+{
+  "output": "opia-reel-fast.mp4",
+  "baseUrl": "http://127.0.0.1:8790",
+  "frame": false,
+  "viewport": { "width": 1080, "height": 1920 },
+  "theme": { "accent": "#d97757", "bg": "#1f1a17", "fg": "#fbf6f2" },
+  "targetSeconds": 20,
+  "maxStill": 0,
+  "bpm": 140,
+  "musicVolume": 0.6,
+  "transitions": false,
+  "note": "Captions, zooms, shakes, stickers and the end card are drawn by the stage (demo/reel/stage.js, reel2.*), so scenes have no recorder captions.",
+  "scenes": [
+    { "steps": [ { "goto": "/", "pause": 0 }, { "eval": "reel2.cold()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.ask()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.fill()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.gaming()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.yeet()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.noPay()", "pause": 0 } ], "hold": 0 },
+    { "steps": [ { "eval": "reel2.end()", "pause": 0 } ], "hold": 0 }
+  ]
+}
