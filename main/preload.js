@@ -32,6 +32,14 @@ contextBridge.exposeInMainWorld('opia', {
   hidePanel: () => ipcRenderer.send('panel:hide'),
   turnOff: () => ipcRenderer.send('app:quit'),
   petMenu: () => ipcRenderer.send('pet:menu'),
+  // permission sidebar
+  onNotify: (cb) => {
+    const handler = (_e, list) => cb(list);
+    ipcRenderer.on('notify:perms', handler);
+    return () => ipcRenderer.removeListener('notify:perms', handler);
+  },
+  notifyResize: (h) => ipcRenderer.send('notify:resize', Number(h) || 0),
+  showPanelFromNotify: () => ipcRenderer.send('notify:openChat'),
   getState: () => ipcRenderer.invoke('app:state'),
   createShortcuts: () => ipcRenderer.invoke('app:shortcuts'),
   linkStatus: () => ipcRenderer.invoke('link:status'),

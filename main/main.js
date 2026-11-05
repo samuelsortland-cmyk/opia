@@ -48,7 +48,10 @@ let link = null; // Opia Link: the bridge to the user's own browser
 let updater = null;
 
 const queue = [];               // prompts waiting while the agent is busy
-const pendingPerms = new Map(); // id -> { resolve, toolName, input, summary }
+const pendingPerms = new Map(); // id -> { resolve, toolName, input, summary, expiresAt }
+const PERMISSION_TIMEOUT_MS = 5 * 60 * 1000; // matches the agent's auto-deny
+let notifyWin = null;   // the permission sidebar
+let notifyHideTimer = null;
 
 // ---------------------------------------------------------------- helpers
 
@@ -221,6 +224,72 @@ function positionPanel() {
 
 // focus=false shows the panel without taking keyboard focus from whatever the user is doing
 // (a game, a document...). Only explicit user actions (prompt button, shortcut, tray) focus it.
+// ---------------------------------------------------------------- permission sidebar
+// When Opia needs an OK and its chat is closed, cards slide in at the right edge of the
+// screen (never taking focus), styled like the prompt box. Allow/Deny answer right there.
+
+const NOTIFY_W = 400;
+
+function createNotifyWindow() {
+  notifyWin = new BrowserWindow({
+    width: NOTIFY_W,
+    height: 200,
+    transparent: true,
+    frame: false,
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: true,
+    fullscreenable: false,
+    backgroundColor: '#00000000',
+    title: 'Opia needs your OK',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+  notifyWin.setAlwaysOnTop(true, 'screen-saver');
+  try { notifyWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (_) {}
+  notifyWin.loadFile(path.join(RENDERER, 'notify.html'));
+  notifyWin.webContents.on('did-finish-load', () => syncNotify());
+  notifyWin.on('closed', () => { notifyWin = null; });
+}
+
+function placeNotify(height) {
+  if (!notifyWin || notifyWin.isDestroyed()) return;
+  const wa = workAreaFor(petWin && !petWin.isDestroyed() ? petWin.getBounds() : null);
+  const h = Math.max(60, Math.min(Math.round(height || 200), wa.height - 40));
+  notifyWin.setBounds({ x: wa.x + wa.width - NOTIFY_W - 6, y: wa.y + 12, width: NOTIFY_W, height: h });
+}
+
+function pendingList() {
+  return [...pendingPerms.values()].map(({ id, toolName, input, summary, expiresAt }) => ({ id, toolName, input, summary, expiresAt }));
+}
+
+/** Show, update or hide the sidebar to match the pending approvals. */
+function syncNotify() {
+  const list = pendingList();
+  const want = list.length > 0 && !panelVisible();
+  if (!want) {
+    if (notifyWin && !notifyWin.isDestroyed()) {
+      notifyWin.webContents.send('notify:perms', []);
+      clearTimeout(notifyHideTimer);
+      notifyHideTimer = setTimeout(() => { if (notifyWin && !notifyWin.isDestroyed() && !(pendingPerms.size && !panelVisible())) notifyWin.hide(); }, 260);
+    }
+    return;
+  }
+  clearTimeout(notifyHideTimer);
+  if (!notifyWin || notifyWin.isDestroyed()) { createNotifyWindow(); return; } // did-finish-load syncs again
+  notifyWin.webContents.send('notify:perms', list);
+  if (!notifyWin.isVisible()) { placeNotify(notifyWin.getBounds().height); notifyWin.showInactive(); }
+}
+
 function showPanel({ focus = true } = {}) {
   if (!panelWin) createPanelWindow();
   positionPanel();
@@ -231,11 +300,13 @@ function showPanel({ focus = true } = {}) {
     panelWin.showInactive();
   }
   broadcast({ type: 'panel', open: true });
+  syncNotify(); // the chat shows the approval cards now
 }
 
 function hidePanel() {
   if (panelWin && !panelWin.isDestroyed()) panelWin.hide();
   broadcast({ type: 'panel', open: false });
+  syncNotify();
 }
 
 function togglePanel() {
@@ -317,12 +388,19 @@ function loadAgent() {
     captureScreen,
     getLinkEndpoint: () => (link ? link.cdpEndpoint() : null),
     onPermissionRequest: (req) => new Promise((resolve) => {
-      pendingPerms.set(req.id, { resolve, ...req });
-      if (!panelVisible()) {
-        // Quiet mode (default): just a notification + the pet waving; don't pop a window over a game.
-        if (!settings.get().quiet) showPanel({ focus: false });
-        notify('Opia needs your OK', `${req.toolName}: ${req.summary || ''}`);
-      }
+      const expiresAt = Date.now() + PERMISSION_TIMEOUT_MS;
+      pendingPerms.set(req.id, { resolve, ...req, expiresAt });
+      // The agent auto-denies after the timeout; drop the card then too.
+      setTimeout(() => {
+        if (!pendingPerms.has(req.id)) return;
+        pendingPerms.delete(req.id);
+        broadcast({ type: 'permission-resolved', id: req.id, allow: false });
+        syncNotify();
+      }, PERMISSION_TIMEOUT_MS + 500).unref();
+      // The sidebar slides in at the screen edge (no focus stolen, safe while gaming).
+      // With quiet mode off, the chat panel opens too (also without taking focus).
+      if (!panelVisible() && !settings.get().quiet) showPanel({ focus: false });
+      syncNotify();
     }),
   });
 
@@ -332,6 +410,7 @@ function loadAgent() {
       // Any approval still open (e.g. timed out inside the agent) is now moot.
       for (const id of pendingPerms.keys()) broadcast({ type: 'permission-resolved', id, allow: false });
       pendingPerms.clear();
+      syncNotify();
       if (!panelVisible()) {
         notify(ev.type === 'done' ? 'Opia finished' : 'Opia hit a snag',
           ev.type === 'done' ? (ev.result || 'Task complete.') : ev.message);
@@ -354,6 +433,7 @@ function stopTask() {
   queue.length = 0;
   broadcast({ type: 'queue', length: 0 });
   for (const [id, p] of pendingPerms) { p.resolve({ allow: false, message: 'Cancelled by user' }); pendingPerms.delete(id); }
+  syncNotify();
   if (agent) agent.cancel();
   rebuildTrayMenu();
   return { ok: true, dropped };
@@ -445,7 +525,10 @@ function registerIpc() {
     pendingPerms.delete(id);
     p.resolve(allow ? { allow: true } : { allow: false, message: 'The user denied this action.' });
     broadcast({ type: 'permission-resolved', id, allow: !!allow });
+    syncNotify();
   });
+  ipcMain.on('notify:resize', (_e, h) => placeNotify(h));
+  ipcMain.on('notify:openChat', () => showPanel());
 
   ipcMain.handle('settings:get', () => settings.get());
   ipcMain.handle('settings:set', (_e, partial) => {

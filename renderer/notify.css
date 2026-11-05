@@ -1,0 +1,46 @@
+/* Opia's permission sidebar: cards that slide in from the screen edge, styled like the prompt box. */
+html, body.notify { background: transparent !important; }
+body.notify { border: 0; border-radius: 0; display: block; overflow: hidden; padding: 10px 12px 14px 18px; }
+#stack { display: flex; flex-direction: column; gap: 10px; }
+
+.ncard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 12px 12px 10px 14px;
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 30px rgba(0, 0, 0, .22), 0 2px 6px rgba(0, 0, 0, .08);
+  color: var(--text);
+  animation: nin .32s cubic-bezier(.2, .9, .3, 1.15) both;
+  position: relative;
+  overflow: hidden;
+}
+.ncard.out { animation: nout .22s ease-in forwards; }
+@keyframes nin { from { transform: translateX(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes nout { to { transform: translateX(110%); opacity: 0; } }
+/* accent edge, like the composer's focus ring */
+.ncard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); }
+
+.nhead { display: flex; align-items: center; gap: 9px; }
+.nhead img { width: 26px; height: 26px; image-rendering: pixelated; animation: jitter .35s steps(2) infinite; flex: 0 0 auto; }
+.ntitle { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+.ntitle b { font: 600 14.5px/1.2 var(--serif); }
+.ntitle span { font-size: 11.5px; color: var(--muted); }
+.nopen { width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; }
+.nopen:hover { background: var(--surface-2); color: var(--text); }
+.nopen svg { width: 16px; height: 16px; }
+
+.nwhat { margin: 8px 0 6px; font-size: 13.5px; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.nwhat b { color: var(--text); }
+.ndetail {
+  margin: 0 0 9px; max-height: 92px; overflow: auto;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 10px; font: 11.5px/1.45 var(--mono); color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.nrow { display: flex; align-items: center; gap: 8px; }
+.nrow .spacer { flex: 1; }
+.ntimer { font-size: 11px; color: var(--muted); }
+.nrow button { border-radius: 10px; padding: 6px 14px; font-size: 13px; }
+.nrow .deny { background: transparent; }
+.nrow .allow { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.nrow .allow:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.nmore { text-align: center; font-size: 11.5px; color: var(--muted); }
