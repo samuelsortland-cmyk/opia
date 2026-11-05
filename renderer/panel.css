@@ -312,3 +312,50 @@ body.chatting #hero { display: none; }
 @keyframes bob { 50% { transform: translateY(-3px); } }
 @keyframes jitter { 0% { transform: translate(0, 0); } 50% { transform: translate(1px, -1px); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------------------------------------------------------------- chat history drawer */
+#scrim { position: absolute; inset: 56px 0 0 0; z-index: 7; background: rgba(0, 0, 0, .18); animation: fadein .15s ease-out; border-radius: 0 0 12px 12px; }
+#drawer {
+  position: absolute; top: 56px; bottom: 0; left: 0; width: 300px; max-width: 86%; z-index: 8;
+  background: var(--surface-2); border-right: 1px solid var(--line); border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; border-radius: 0 0 0 12px;
+  box-shadow: 8px 0 30px rgba(0, 0, 0, .12); animation: drawerin .2s cubic-bezier(.2, .9, .3, 1);
+}
+@keyframes drawerin { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes fadein { from { opacity: 0; } }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 4px 16px; }
+.drawer-head h2 { margin: 0; font: 400 19px/1.2 var(--serif); }
+.drawer-new {
+  margin: 4px 10px 8px; display: flex; align-items: center; gap: 8px; justify-content: flex-start;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-weight: 600; color: var(--text);
+}
+.drawer-new svg { width: 16px; height: 16px; color: var(--accent); stroke-width: 2.2; }
+.drawer-new:hover { border-color: var(--line-strong); }
+#chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
+#chat-list::-webkit-scrollbar { width: 7px; }
+#chat-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 7px; }
+.chat-group { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 12px 10px 4px; }
+.chat-item {
+  display: flex; align-items: center; gap: 4px; border-radius: 10px; padding: 0 4px 0 10px; min-height: 36px; cursor: pointer;
+  color: var(--text-2); font-size: 13.5px;
+}
+.chat-item:hover { background: var(--surface); }
+.chat-item.current { background: var(--surface); color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
+.chat-item .ttl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 8px 0; }
+.chat-item .acts { display: none; gap: 0; }
+.chat-item:hover .acts, .chat-item:focus-within .acts { display: flex; }
+.chat-item .acts button { width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; }
+.chat-item .acts button:hover { background: var(--surface-2); color: var(--text); }
+.chat-item .acts .del:hover { color: var(--bad); }
+.chat-item .acts svg { width: 15px; height: 15px; }
+.chat-item input { flex: 1; min-width: 0; font: 13.5px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--accent); border-radius: 7px; padding: 5px 8px; outline: none; margin: 3px 0; }
+.chat-item.confirm { background: rgba(194, 70, 61, .08); flex-wrap: wrap; padding: 8px 8px 8px 10px; cursor: default; }
+.chat-item.confirm .q { flex: 1 0 100%; font-size: 12.5px; color: var(--text); margin-bottom: 6px; }
+.chat-item.confirm button { padding: 4px 11px; font-size: 12.5px; border-radius: 8px; }
+.chat-item.confirm .yes { background: var(--bad); border-color: var(--bad); color: #fff; margin-right: 6px; }
+.chat-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 10px; }
+.drawer-foot { display: flex; align-items: center; gap: 8px; padding: 8px 12px 12px; border-top: 1px solid var(--line); }
+#chat-count { flex: 1; font-size: 11.5px; color: var(--muted); }
+.drawer-danger { background: transparent; border-color: transparent; color: var(--muted); font-size: 12px; padding: 5px 8px; }
+.drawer-danger:hover { color: var(--bad); background: rgba(194, 70, 61, .08); border-color: transparent; }
+.drawer-danger.armed { color: #fff; background: var(--bad); border-color: var(--bad); }

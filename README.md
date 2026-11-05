@@ -53,7 +53,8 @@ The chat panel is laid out like a familiar chat app:
 | Close the panel (✕ or Esc) | **Opia keeps working in the background.** You get a notification when it's done or needs approval |
 | Send another task while busy | It is queued and runs next |
 | ■ Stop (or **Ctrl+.** in the panel, or **tray → Stop current task**) | Stops the current task **immediately**, even if it's stuck: Claude Code and everything it started (browser tools, commands) are shut down, and the queue is cleared |
-| ＋ New chat | Forgets the previous conversation (otherwise Opia remembers it with `--resume`) |
+| **Chats** (▯ icon, top right) | Your chat history: Opia remembers every chat. Click one to go back to it, and Opia picks up that conversation where you left off. Hover a chat to **rename** ✎ or **delete** 🗑 it; **Delete all chats** is at the bottom (click twice) |
+| ✎ New chat | Starts a fresh chat; the old one stays in **Chats** until you delete it |
 | Drag Opia | Moves it. Let go and it falls to the bottom of the screen with gravity |
 | **Fling Opia** (drag fast and let go) | It flies, bounces off the screen edges and floor, and maybe gets dizzy. Click it mid-air to catch it |
 | Ask about your screen ("what's this question?", "can you see my screen?") | Opia takes a screenshot of the display under your cursor and looks at it |
@@ -101,6 +102,14 @@ This is a strong guard but not a perfect one: an unusual payment flow it doesn't
 ### Other options (Settings → Where Opia browses)
 - **My browser, picked tabs (Playwright Extension):** uses the store's [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) instead of Developer mode. Opia only sees the tabs in its own tab group (drag tabs in to share them), and Edge comes to the front when it connects.
 - **Opia's own invisible browser:** no setup. Opia uses a separate, hidden Edge/Chrome profile, so results don't appear in your tabs. Untick **Hide Opia's browser** to sign in to sites there once.
+
+## Chat history
+
+- Every chat is saved on your computer (`opia-chats.json` in Opia's app-data folder) and comes back when you restart Opia.
+- Each chat is its own Claude Code conversation, so switching chats switches what Opia remembers.
+- Chats are named after your first message; rename them any time.
+- **Deleting a chat** removes it from Opia and also deletes Claude Code's own saved copy of that conversation (`~/.claude/projects/…/<session>.jsonl`), so it's really gone. Other conversations aren't touched.
+- You can't switch or delete the chat Opia is working in until you stop the task (■).
 
 ## Seeing your screen
 
@@ -168,6 +177,7 @@ opia/
   main/agent.js        Claude Code CLI wrapper (stream-json, --resume, MCP config)
   main/physics.js      fling physics: gravity, bounces, friction
   main/updater.js      self-updater from GitHub
+  main/chats.js        chat history (saved chats, each tied to its Claude Code session)
   main/link.js         Opia Link relay: the extension <-> Playwright MCP bridge, payment-site block
 extension/             Opia Link browser extension (all tabs via chrome.debugger) + payment guard
   main/tools/          MCP bridge (approve + see_screen), helpers

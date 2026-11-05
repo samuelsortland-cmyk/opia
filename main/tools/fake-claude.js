@@ -13,7 +13,9 @@ if (argv[0] === 'auth') { console.log(JSON.stringify({ loggedIn: process.env.FAK
 
 const flag = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
 const out = (o) => process.stdout.write(JSON.stringify(o) + '\n');
-const SID = flag('--resume') || 'fake-session-1';
+const SID = flag('--resume') || (process.env.FAKE_NEW_SESSION === 'random' ? require('crypto').randomUUID() : 'fake-session-1');
+// Test aid: log each run's arguments (used to check that chats resume their own session).
+if (process.env.FAKE_ARGS_LOG) fs.appendFileSync(process.env.FAKE_ARGS_LOG, JSON.stringify({ resume: flag('--resume') || null, sid: SID }) + '\n');
 
 let prompt = '';
 process.stdin.setEncoding('utf8');

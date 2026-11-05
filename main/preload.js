@@ -23,6 +23,13 @@ contextBridge.exposeInMainWorld('opia', {
   sendPrompt: (text) => ipcRenderer.invoke('agent:prompt', String(text || '')),
   cancel: () => ipcRenderer.invoke('agent:cancel'),
   newSession: () => ipcRenderer.invoke('agent:newSession'),
+  // chat history
+  listChats: () => ipcRenderer.invoke('chats:list'),
+  currentChat: () => ipcRenderer.invoke('chats:current'),
+  newChat: () => ipcRenderer.invoke('chats:new'),
+  openChat: (id) => ipcRenderer.invoke('chats:open', String(id)),
+  renameChat: (id, title) => ipcRenderer.invoke('chats:rename', String(id), String(title || '')),
+  deleteChats: (ids) => ipcRenderer.invoke('chats:delete', ids === 'all' ? 'all' : [].concat(ids).map(String)),
   respondPermission: (id, allow) => ipcRenderer.send('agent:permission', id, !!allow),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial) => ipcRenderer.invoke('settings:set', partial || {}),

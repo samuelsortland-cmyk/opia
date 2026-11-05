@@ -10,6 +10,7 @@ const {
 const { spawn } = require('child_process');
 const { LinkServer } = require('./link');
 const shortcuts = require('./shortcuts');
+const { ChatStore, deleteClaudeTranscripts } = require('./chats');
 const { Settings } = require('./settings');
 const { createPhysics } = require('./physics');
 const { createUpdater } = require('./updater');
@@ -45,6 +46,7 @@ const dragFollow = false; // panel stays put when the pet wanders
 
 let physics = null;
 let link = null; // Opia Link: the bridge to the user's own browser
+let chats = null; // chat history
 let updater = null;
 
 const queue = [];               // prompts waiting while the agent is busy
@@ -404,8 +406,13 @@ function loadAgent() {
     }),
   });
 
+  if (chats) agent.sessionId = (chats.current() || {}).sessionId || null; // resume the open chat
   agent.on('event', (ev) => {
     broadcast(ev);
+    if (chats) {
+      chats.record(ev);
+      if (ev.type === 'done' || ev.type === 'error') { chats.setSession(agent.sessionId); broadcast({ type: 'chats' }); }
+    }
     if (ev.type === 'done' || ev.type === 'error') {
       // Any approval still open (e.g. timed out inside the agent) is now moot.
       for (const id of pendingPerms.keys()) broadcast({ type: 'permission-resolved', id, allow: false });
@@ -463,6 +470,7 @@ function enqueuePrompt(text) {
     return { ok: false, error: message };
   }
   queue.push(text);
+  if (chats) { chats.addUser(text); broadcast({ type: 'chats' }); }
   const queued = agent.busy;
   if (queued) {
     broadcast({ type: 'queue', length: queue.length });
@@ -515,14 +523,50 @@ function registerIpc() {
   ipcMain.handle('agent:prompt', (_e, text) => enqueuePrompt(text));
   ipcMain.handle('agent:cancel', () => stopTask());
   ipcMain.handle('app:shortcuts', () => shortcuts.createShortcuts(app, shell));
-  ipcMain.handle('agent:newSession', () => {
-    if (agent) agent.newSession();
-    return { ok: true };
+  // ---------- chat history ----------
+  const busyNow = () => !!(agent && agent.busy) || queue.length > 0;
+  const chatOut = (c) => (c ? { id: c.id, title: c.title, messages: c.messages, updatedAt: c.updatedAt } : null);
+  const blocked = { ok: false, error: 'Opia is working on something in this chat. Stop it first (■), then switch.' };
+  const newChat = () => {
+    if (busyNow()) return blocked;
+    const c = chats.create();
+    if (agent) agent.sessionId = null;
+    broadcast({ type: 'chats' });
+    return { ok: true, chat: chatOut(c) };
+  };
+  ipcMain.handle('agent:newSession', newChat);
+  ipcMain.handle('chats:new', newChat);
+  ipcMain.handle('chats:list', () => (chats ? chats.list() : []));
+  ipcMain.handle('chats:current', () => chatOut(chats && chats.current()));
+  ipcMain.handle('chats:open', (_e, id) => {
+    if (chats.current() && chats.current().id === id) return { ok: true, chat: chatOut(chats.current()) };
+    if (busyNow()) return blocked;
+    const c = chats.open(id);
+    if (!c) return { ok: false, error: 'That chat no longer exists.' };
+    if (agent) agent.sessionId = c.sessionId || null;
+    broadcast({ type: 'chats' });
+    return { ok: true, chat: chatOut(c) };
+  });
+  ipcMain.handle('chats:rename', (_e, id, title) => {
+    const c = chats.rename(id, title);
+    broadcast({ type: 'chats' });
+    return { ok: !!c };
+  });
+  ipcMain.handle('chats:delete', (_e, ids) => {
+    const list = ids === 'all' ? chats.list().map((c) => c.id) : [].concat(ids || []);
+    const cur = chats.current();
+    if (busyNow() && cur && list.includes(cur.id)) return { ok: false, error: 'Opia is working in that chat. Stop it first (■), then delete it.' };
+    const sessions = chats.remove(list);
+    const removedFiles = deleteClaudeTranscripts(sessions);
+    if (agent && !busyNow()) agent.sessionId = (chats.current() || {}).sessionId || null;
+    broadcast({ type: 'chats' });
+    return { ok: true, deleted: list.length, removedFiles, chat: chatOut(chats.current()) };
   });
   ipcMain.on('agent:permission', (_e, id, allow) => {
     const p = pendingPerms.get(id);
     if (!p) return;
     pendingPerms.delete(id);
+    if (chats) chats.record({ type: 'permission-resolved', id, allow: !!allow, toolName: p.toolName, summary: p.summary });
     p.resolve(allow ? { allow: true } : { allow: false, message: 'The user denied this action.' });
     broadcast({ type: 'permission-resolved', id, allow: !!allow });
     syncNotify();
@@ -582,6 +626,7 @@ app.on('second-instance', () => showPanel());
 app.whenReady().then(() => {
   settings = new Settings(app.getPath('userData'));
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
+  chats = new ChatStore(app.getPath('userData'));
   registerIpc();
   loadAgent();
   // Easy ways to open Opia: shortcuts on first run (refreshed if Opia moved), optional log-in start.
@@ -646,6 +691,7 @@ app.on('window-all-closed', (e) => { if (!quitting) e.preventDefault(); });
 app.on('before-quit', () => {
   quitting = true;
   if (physics) physics.stop('quit');
+  try { if (chats) chats.flush(); } catch (_) {}
   try { if (link) link.stop(); } catch (_) {}
   for (const p of pendingPerms.values()) p.resolve({ allow: false, message: 'Opia is quitting' });
   pendingPerms.clear();

@@ -225,6 +225,9 @@
       case 'update':
         showUpdate(ev);
         break;
+      case 'chats':
+        refreshChatList();
+        break;
       case 'link':
         refreshExtension();
         break;
@@ -303,16 +306,153 @@
     if (busy && !confirm('Opia is working on a task. Stop it and turn Opia off?')) return;
     opia.turnOff();
   });
-  $('btn-new').addEventListener('click', async () => {
-    await opia.newSession();
+  // ------------------------------------------------------------ chat history
+
+  const drawer = $('drawer'), scrim = $('scrim'), chatList = $('chat-list');
+  const PENCIL = '<svg viewBox="0 0 20 20"><path d="M13.6 3.9a1.6 1.6 0 0 1 2.3 2.3L7.5 14.6l-3 .8.8-3z"/></svg>';
+  const TRASH = '<svg viewBox="0 0 20 20"><path d="M4 6h12M8 6V4.5h4V6M6 6l.7 9.5a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L14 6"/></svg>';
+
+  function clearLog() {
     endAssistantBubble();
     finishSteps();
     log.querySelectorAll('.msg').forEach((m) => m.remove());
     document.body.classList.remove('chatting');
     setGreeting();
-    addMsg('meta', 'new chat — Opia forgot the previous conversation');
+  }
+
+  /** Show a saved chat's messages. */
+  function renderChat(chat) {
+    clearLog();
+    if (!chat) return;
+    for (const m of chat.messages || []) {
+      if (m.role === 'user') { startChat(); addMsg('user', md(m.text)); }
+      else if (m.role === 'assistant') { appendAssistant(m.text, false); }
+      else if (m.role === 'steps') { for (const st of m.steps || []) addStep(st.name, st.summary); finishSteps(); }
+      else if (m.role === 'error') { addMsg('error', `⚠ ${escapeHtml(m.text)}`); }
+      else if (m.role === 'meta') { addMsg('meta', escapeHtml(m.text)); }
+    }
+    endAssistantBubble();
+    finishSteps();
+    scrollDown(true);
+  }
+
+  function showErr(res) {
+    if (res && res.ok === false) { addMsg('error', `⚠ ${escapeHtml(res.error || 'Could not do that')}`); return true; }
+    return false;
+  }
+
+  async function newChatUI() {
+    const res = await opia.newChat();
+    if (showErr(res)) return;
+    clearLog();
+    closeDrawer();
     promptEl.focus();
+  }
+  $('btn-new').addEventListener('click', newChatUI);
+  $('btn-drawer-new').addEventListener('click', newChatUI);
+
+  function openDrawer() { drawer.hidden = false; scrim.hidden = false; settingsEl.hidden = true; refreshChatList(); }
+  function closeDrawer() { drawer.hidden = true; scrim.hidden = true; }
+  $('btn-chats').addEventListener('click', () => (drawer.hidden ? openDrawer() : closeDrawer()));
+  $('btn-drawer-close').addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) { e.stopPropagation(); closeDrawer(); } }, true);
+
+  function groupOf(ts) {
+    const d = new Date(ts), now = new Date();
+    const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diff = Math.round((day(now) - day(d)) / 86400000);
+    if (diff <= 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    if (diff < 7) return 'Previous 7 days';
+    if (diff < 30) return 'Previous 30 days';
+    return 'Older';
+  }
+
+  async function refreshChatList() {
+    if (drawer.hidden) return;
+    let list = [];
+    try { list = await opia.listChats(); } catch (_) {}
+    chatList.innerHTML = '';
+    const real = list.filter((c) => c.count > 0 || c.current);
+    $('chat-count').textContent = `${real.length} chat${real.length === 1 ? '' : 's'}`;
+    if (!real.length) { chatList.innerHTML = '<div class="chat-empty">No chats yet. Say hi to Opia!</div>'; return; }
+    let group = '';
+    for (const c of real) {
+      const g = groupOf(c.updatedAt);
+      if (g !== group) { group = g; const h = document.createElement('div'); h.className = 'chat-group'; h.textContent = g; chatList.appendChild(h); }
+      chatList.appendChild(chatItem(c));
+    }
+  }
+
+  function chatItem(c) {
+    const el = document.createElement('div');
+    el.className = 'chat-item' + (c.current ? ' current' : '');
+    el.tabIndex = 0;
+    el.title = c.title;
+    el.innerHTML = `<span class="ttl">${escapeHtml(c.title)}</span><span class="acts"><button class="ren" title="Rename">${PENCIL}</button><button class="del" title="Delete">${TRASH}</button></span>`;
+    el.addEventListener('click', async (e) => {
+      if (e.target.closest('.acts') || el.classList.contains('confirm') || el.querySelector('input')) return;
+      const res = await opia.openChat(c.id);
+      if (showErr(res)) { closeDrawer(); return; }
+      renderChat(res.chat);
+      closeDrawer();
+      promptEl.focus();
+    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === el) el.click(); });
+    el.querySelector('.ren').addEventListener('click', () => startRename(el, c));
+    el.querySelector('.del').addEventListener('click', () => confirmDelete(el, c));
+    return el;
+  }
+
+  function startRename(el, c) {
+    const ttl = el.querySelector('.ttl');
+    const input = document.createElement('input');
+    input.value = c.title; input.maxLength = 80;
+    ttl.replaceWith(input); el.querySelector('.acts').style.display = 'none';
+    input.focus(); input.select();
+    let done = false;
+    const finish = async (save) => {
+      if (done) return; done = true;
+      if (save && input.value.trim() && input.value.trim() !== c.title) await opia.renameChat(c.id, input.value.trim());
+      refreshChatList();
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') { e.stopPropagation(); finish(false); } });
+    input.addEventListener('blur', () => finish(true));
+  }
+
+  function confirmDelete(el, c) {
+    el.classList.add('confirm');
+    el.innerHTML = `<div class="q">Delete “${escapeHtml(c.title)}”? Opia forgets this chat for good.</div><button class="yes">Delete</button><button class="no">Cancel</button>`;
+    el.querySelector('.no').addEventListener('click', (e) => { e.stopPropagation(); refreshChatList(); });
+    el.querySelector('.yes').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const res = await opia.deleteChats([c.id]);
+      if (showErr(res)) return;
+      if (c.current) renderChat(res.chat);
+      refreshChatList();
+    });
+    el.querySelector('.yes').focus();
+  }
+
+  const delAll = $('btn-delete-all');
+  let armTimer = null;
+  delAll.addEventListener('click', async () => {
+    if (!delAll.classList.contains('armed')) {
+      delAll.classList.add('armed'); delAll.textContent = 'Click again to delete all';
+      clearTimeout(armTimer);
+      armTimer = setTimeout(() => { delAll.classList.remove('armed'); delAll.textContent = 'Delete all chats'; }, 3500);
+      return;
+    }
+    clearTimeout(armTimer); delAll.classList.remove('armed'); delAll.textContent = 'Delete all chats';
+    const res = await opia.deleteChats('all');
+    if (showErr(res)) return;
+    renderChat(res.chat);
+    refreshChatList();
   });
+
+  // Show the chat that was open last time.
+  opia.currentChat().then((chat) => { if (chat && chat.messages && chat.messages.length) renderChat(chat); }).catch(() => {});
 
   // ------------------------------------------------------------ settings
 
