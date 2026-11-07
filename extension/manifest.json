@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Opia Link",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lets the Opia 5.5 desktop pet read and work in your open tabs. Talks only to Opia on this computer (127.0.0.1). Payments are blocked.",
   "minimum_chrome_version": "125",
   "permissions": ["debugger", "tabs", "alarms", "storage"],

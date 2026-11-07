@@ -157,6 +157,9 @@ class ChatStore {
       case 'error':
         this._push({ role: 'error', text: ev.message || 'Something went wrong' });
         break;
+      case 'note':
+        this._push({ role: 'meta', text: ev.text || '' });
+        break;
       default:
         break;
     }

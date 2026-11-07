@@ -15,6 +15,62 @@
 
 const URL_ = process.env.OPIA_PERM_URL;
 const SCREEN_URL = process.env.OPIA_SCREEN_URL;
+const TEAM_URL = process.env.OPIA_TEAM_URL;
+const ROLE = process.env.OPIA_ROLE || 'solo'; // 'lead' (may call in helpers), 'helper', or 'solo'
+const MAX_HELPERS = Number(process.env.OPIA_MAX_HELPERS || 3);
+
+const TEAM_TOOLS = [
+  {
+    name: 'spawn_helpers',
+    description: `Call in up to ${MAX_HELPERS} helper Opias to work on independent parts of a long task IN PARALLEL, then wait for all of them and get their results. ` +
+      'Each helper is another Opia with the same tools (its own hidden browser, this computer\'s files) and can\'t see this chat, so give each a complete, self-contained task. ' +
+      'Helpers coordinate on the team board. Use only for long tasks that split into independent parts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'The overall goal, in one or two sentences (all helpers see it).' },
+        helpers: {
+          type: 'array', minItems: 1, maxItems: MAX_HELPERS,
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Short name for this part, 2-4 words (shown on screen).' },
+              task: { type: 'string', description: 'Complete, self-contained instructions for this helper: what to do and what to report back.' },
+            },
+            required: ['name', 'task'],
+          },
+        },
+      },
+      required: ['goal', 'helpers'],
+    },
+  },
+  {
+    name: 'team_board_read',
+    description: 'Read the team board: notes posted by the main Opia and the helpers (shared facts, decisions, what is already covered).',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'team_board_post',
+    description: 'Post a short note on the team board for the main Opia and the other helpers (key facts, decisions, what you have covered).',
+    inputSchema: { type: 'object', properties: { note: { type: 'string', description: 'The note, 1-4 sentences.' } }, required: ['note'] },
+  },
+];
+function teamTools() {
+  if (!TEAM_URL) return [];
+  if (ROLE === 'lead') return TEAM_TOOLS;
+  if (ROLE === 'helper') return TEAM_TOOLS.slice(1);
+  return [];
+}
+async function teamCall(name, args) {
+  const action = { spawn_helpers: 'spawn', team_board_read: 'board_read', team_board_post: 'board_post' }[name];
+  try {
+    const r = await postJson(TEAM_URL, { action, args: args || {} });
+    if (!r || r.error) return { content: [{ type: 'text', text: (r && r.error) || 'The team tool failed.' }], isError: true };
+    return { content: [{ type: 'text', text: String(r.text || '') }] };
+  } catch (e) {
+    return { content: [{ type: 'text', text: e.message }], isError: true };
+  }
+}
 const TOKEN = process.env.OPIA_PERM_TOKEN || '';
 const http = require('http');
 
@@ -146,9 +202,12 @@ async function handle(msg) {
     case 'ping':
       return isRequest && send({ jsonrpc: '2.0', id, result: {} });
     case 'tools/list':
-      return send({ jsonrpc: '2.0', id, result: { tools: [TOOL, SCREEN_TOOL] } });
+      return send({ jsonrpc: '2.0', id, result: { tools: [TOOL, SCREEN_TOOL, ...teamTools()] } });
     case 'tools/call': {
       const name = params && params.name;
+      if (teamTools().some((t) => t.name === name)) {
+        return send({ jsonrpc: '2.0', id, result: await teamCall(name, (params && params.arguments) || {}) });
+      }
       if (name === 'see_screen') {
         return send({ jsonrpc: '2.0', id, result: await seeScreen((params && params.arguments) || {}) });
       }

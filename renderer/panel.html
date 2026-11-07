@@ -102,6 +102,15 @@
       <span>Model (optional)</span>
       <input type="text" id="set-model" spellcheck="false" placeholder="default">
     </label>
+    <h3>Helper Opias</h3>
+    <label class="row check">
+      <input type="checkbox" id="set-helpersEnabled">
+      <span>Let Opia call in helper Opias for long tasks (they work in parallel; each uses your Claude plan)</span>
+    </label>
+    <label class="row">
+      <span>Most helpers at once</span>
+      <select id="set-maxHelpers"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>
+    </label>
     <h3>Opening Opia</h3>
     <label class="row check">
       <input type="checkbox" id="set-openAtLogin">

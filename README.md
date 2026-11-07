@@ -103,6 +103,16 @@ This is a strong guard but not a perfect one: an unusual payment flow it doesn't
 - **My browser, picked tabs (Playwright Extension):** uses the store's [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) instead of Developer mode. Opia only sees the tabs in its own tab group (drag tabs in to share them), and Edge comes to the front when it connects.
 - **Opia's own invisible browser:** no setup. Opia uses a separate, hidden Edge/Chrome profile, so results don't appear in your tabs. Untick **Hide Opia's browser** to sign in to sites there once.
 
+## Helper Opias (teamwork for long tasks)
+
+When a task is long and splits into independent parts, such as researching several sites, comparing options or sorting a big folder, Opia can **call in helper Opias**. Each one pops out of Opia as a smaller, tinted Opia (#2, #3, …) and works on its own part **at the same time**.
+- **Coordination:** helpers share a **team board**, posting key findings so they don't duplicate work. The main Opia waits for all of them, checks their results and combines them into one answer.
+- **Progress:** the chat shows a live team card with each helper's status and latest step. Helper Opias leave the screen a few seconds after they finish.
+- **Browsing:** helpers each use their own hidden browser, since only one Opia can work in your own tabs at a time.
+- **Safety:** helpers follow the same rules. Their risky actions ask you first, and the card says which helper is asking. Payments are blocked in every Opia browser. **■ Stop** stops the whole team.
+- **Cost:** each helper is its own Claude Code conversation, so it **uses your Claude plan too**. Opia only calls helpers in for long, splittable tasks.
+- **Settings → Helper Opias:** turn them off, or set the most helpers at once (2–5, default 3).
+
 ## Chat history
 
 - Every chat is saved on your computer (`opia-chats.json` in Opia's app-data folder) and comes back when you restart Opia.
@@ -178,6 +188,7 @@ opia/
   main/physics.js      fling physics: gravity, bounces, friction
   main/updater.js      self-updater from GitHub
   main/chats.js        chat history (saved chats, each tied to its Claude Code session)
+  main/team.js         helper Opias: parallel helpers, team board, results back to the main Opia
   main/link.js         Opia Link relay: the extension <-> Playwright MCP bridge, payment-site block
 extension/             Opia Link browser extension (all tabs via chrome.debugger) + payment guard
   main/tools/          MCP bridge (approve + see_screen), helpers

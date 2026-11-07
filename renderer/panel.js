@@ -228,6 +228,9 @@
       case 'chats':
         refreshChatList();
         break;
+      case 'team':
+        renderTeam(ev);
+        break;
       case 'link':
         refreshExtension();
         break;
@@ -306,6 +309,36 @@
     if (busy && !confirm('Opia is working on a task. Stop it and turn Opia off?')) return;
     opia.turnOff();
   });
+  // ------------------------------------------------------------ helper team card
+
+  const HELPER_HUE = { 2: 150, 3: 245, 4: 300, 5: 85, 6: 40 };
+  const STATE_LABEL = { starting: 'starting', working: 'working', waiting: 'needs your OK', done: 'done', error: 'hit a snag', stopped: 'stopped' };
+  let teamCard = null, teamKey = '';
+  function renderTeam(t) {
+    if (!t || !t.helpers || !t.helpers.length) return;
+    const key = t.helpers.map((h) => h.index + h.name).join('|') + '|' + t.goal;
+    if (!teamCard || key !== teamKey || !teamCard.isConnected) {
+      startChat();
+      teamKey = key;
+      teamCard = addMsg('team', '');
+    }
+    const n = t.helpers.length;
+    const done = t.helpers.filter((h) => ['done', 'error', 'stopped'].includes(h.state)).length;
+    teamCard.classList.toggle('finished', !t.running);
+    teamCard.innerHTML = `
+      <div class="team-head"><span class="team-icon">🎩</span><div><b>${t.running ? `Opia called in ${n} helper${n > 1 ? 's' : ''}` : `Team finished (${done}/${n})`}</b>
+        <span>${escapeHtml(t.goal || '')}</span></div></div>
+      <div class="team-rows">${t.helpers.map((h) => `
+        <div class="team-row ${h.state}">
+          <span class="team-dot" style="background:hsl(${(14 + (HELPER_HUE[h.index] || 180)) % 360} 62% 58%)"></span>
+          <span class="team-name">#${h.index} ${escapeHtml(h.name)}</span>
+          <span class="team-state">${STATE_LABEL[h.state] || h.state}</span>
+          <span class="team-last">${escapeHtml(h.last || '')}</span>
+        </div>`).join('')}</div>
+      <div class="team-foot">${t.board ? `${t.board} note${t.board > 1 ? 's' : ''} on the team board · ` : ''}helpers use your Claude plan too · ■ stops them all</div>`;
+    scrollDown();
+  }
+
   // ------------------------------------------------------------ chat history
 
   const drawer = $('drawer'), scrim = $('scrim'), chatList = $('chat-list');
@@ -456,7 +489,7 @@
 
   // ------------------------------------------------------------ settings
 
-  const FIELDS = ['openAtLogin', 'permissionMode', 'browserMode', 'extensionToken', 'browserProfile', 'screenAccess', 'quiet', 'autoUpdateCheck', 'updateRepo', 'updateBranch', 'updatePath', 'updateToken', 'browserHeadless', 'browser', 'browserPath', 'cwd', 'claudePath', 'model'];
+  const FIELDS = ['helpersEnabled', 'maxHelpers', 'openAtLogin', 'permissionMode', 'browserMode', 'extensionToken', 'browserProfile', 'screenAccess', 'quiet', 'autoUpdateCheck', 'updateRepo', 'updateBranch', 'updatePath', 'updateToken', 'browserHeadless', 'browser', 'browserPath', 'cwd', 'claudePath', 'model'];
 
   async function loadSettings() {
     const s = await opia.getSettings();
@@ -500,7 +533,7 @@
     const partial = {};
     for (const k of FIELDS) {
       const el = $('set-' + k);
-      partial[k] = el.type === 'checkbox' ? el.checked : el.value;
+      partial[k] = el.type === 'checkbox' ? el.checked : k === 'maxHelpers' ? Number(el.value) : el.value;
     }
     await opia.setSettings(partial);
     $('settings-saved').textContent = 'Saved ✓ (applies to the next task)';

@@ -11,7 +11,8 @@
   if (window.__opiaGuard) return;
   window.__opiaGuard = true;
 
-  let active = false;
+  // Always on in Opia's own browsers (injected as a Playwright init script); in Opia Link, on while Opia works here.
+  let active = !!window.__opiaGuardAlwaysOn;
 
   const PAY_HOSTS = /(^|\.)(paypal\.com|paypalobjects\.com|venmo\.com|cash\.app|pay\.google\.com|payments\.google\.com|checkout\.stripe\.com|js\.stripe\.com|hooks\.stripe\.com|m\.stripe\.network|braintreegateway\.com|braintree-api\.com|adyen\.com|checkout\.com|squareup\.com|square\.link|klarna\.com|afterpay\.com|clearpay\.co\.uk|affirm\.com|zip\.co|sezzle\.com|pay\.amazon\.com|payments\.amazon\.com|wise\.com|zellepay\.com|recurly\.com|chargebee\.com|paddle\.com|2checkout\.com|authorize\.net|worldpay\.com|payoneer\.com|skrill\.com|revolut\.com|coinbase\.com|apple\.com\/apple-pay)$/i;
   const onPaySite = PAY_HOSTS.test(location.hostname) || /\/(checkout|payment|pay|billing|purchase)(\/|$|\?)/i.test(location.pathname);
@@ -114,7 +115,7 @@
 
   // Is Opia attached to this tab right now?
   try {
-    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.opia === 'active') active = !!msg.on; });
-    chrome.runtime.sendMessage({ opia: 'state' }, (r) => { void chrome.runtime.lastError; if (r) active = !!r.active; });
+    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.opia === 'active' && !window.__opiaGuardAlwaysOn) active = !!msg.on; });
+    if (!window.__opiaGuardAlwaysOn) chrome.runtime.sendMessage({ opia: 'state' }, (r) => { void chrome.runtime.lastError; if (r) active = !!r.active; });
   } catch (_) {}
 })();

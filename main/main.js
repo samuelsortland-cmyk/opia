@@ -11,6 +11,7 @@ const { spawn } = require('child_process');
 const { LinkServer } = require('./link');
 const shortcuts = require('./shortcuts');
 const { ChatStore, deleteClaudeTranscripts } = require('./chats');
+const { Team } = require('./team');
 const { Settings } = require('./settings');
 const { createPhysics } = require('./physics');
 const { createUpdater } = require('./updater');
@@ -47,6 +48,8 @@ const dragFollow = false; // panel stays put when the pet wanders
 let physics = null;
 let link = null; // Opia Link: the bridge to the user's own browser
 let chats = null; // chat history
+let team = null;  // helper Opias for long tasks
+const helperWins = new Map(); // helper index -> { win, physics }
 let updater = null;
 
 const queue = [];               // prompts waiting while the agent is busy
@@ -389,21 +392,38 @@ function loadAgent() {
     getSettings: () => settings.get(),
     captureScreen,
     getLinkEndpoint: () => (link ? link.cdpEndpoint() : null),
-    onPermissionRequest: (req) => new Promise((resolve) => {
-      const expiresAt = Date.now() + PERMISSION_TIMEOUT_MS;
-      pendingPerms.set(req.id, { resolve, ...req, expiresAt });
-      // The agent auto-denies after the timeout; drop the card then too.
-      setTimeout(() => {
-        if (!pendingPerms.has(req.id)) return;
-        pendingPerms.delete(req.id);
-        broadcast({ type: 'permission-resolved', id: req.id, allow: false });
-        syncNotify();
-      }, PERMISSION_TIMEOUT_MS + 500).unref();
-      // The sidebar slides in at the screen edge (no focus stolen, safe while gaming).
-      // With quiet mode off, the chat panel opens too (also without taking focus).
-      if (!panelVisible() && !settings.get().quiet) showPanel({ focus: false });
-      syncNotify();
+    onTeam: (req) => (team ? team.handle(req) : { error: 'Helpers are not available.' }),
+    onPermissionRequest: (req) => requestPermission(req),
+  });
+
+  // Helper Opias: the main Opia can call them in for long tasks (spawn_helpers).
+  team = new Team({
+    getSettings: () => settings.get(),
+    createAgent: (helper) => new mod.OpiaAgent({
+      userDataDir: app.getPath('userData'),
+      getSettings: () => settings.get(),
+      role: 'helper',
+      helper,
+      onTeam: (req) => team.handle(req),
+      onPermissionRequest: (req) => {
+        const tagged = { ...req, summary: `Opia #${helper.index} (${helper.name}): ${req.summary || ''}` };
+        broadcast({ type: 'permission', id: req.id, toolName: req.toolName, input: req.input, summary: tagged.summary });
+        return requestPermission(tagged);
+      },
     }),
+  });
+  team.on('update', (snap) => broadcast({ type: 'team', ...snap }));
+  team.on('start', (snap) => snap.helpers.forEach((h, k) => createHelperPet(h, k)));
+  team.on('helper-event', (h, ev) => {
+    const w = helperWins.get(h.index);
+    if (w && w.win && !w.win.isDestroyed() && ['status', 'tool', 'assistant', 'done', 'error', 'permission'].includes(ev.type)) w.win.webContents.send('agent:event', ev);
+  });
+  team.on('finish', (snap) => {
+    if (chats) {
+      const mark = { done: '✓', error: '✕', stopped: '■' };
+      chats.record({ type: 'note', text: `Team of ${snap.helpers.length} helpers: ` + snap.helpers.map((h) => `${mark[h.state] || '·'} ${h.name}`).join(' · ') });
+    }
+    for (const h of snap.helpers) closeHelperPet(h.index, 4500);
   });
 
   if (chats) agent.sessionId = (chats.current() || {}).sessionId || null; // resume the open chat
@@ -434,6 +454,62 @@ function turnOff() {
   app.quit();
 }
 
+/** Ask the user to approve a tool call (main Opia or a helper): sidebar card + chat card. */
+function requestPermission(req) {
+  return new Promise((resolve) => {
+    const expiresAt = Date.now() + PERMISSION_TIMEOUT_MS;
+    pendingPerms.set(req.id, { resolve, ...req, expiresAt });
+    // The agent auto-denies after the timeout; drop the card then too.
+    setTimeout(() => {
+      if (!pendingPerms.has(req.id)) return;
+      pendingPerms.delete(req.id);
+      broadcast({ type: 'permission-resolved', id: req.id, allow: false });
+      syncNotify();
+    }, PERMISSION_TIMEOUT_MS + 500).unref();
+    // The sidebar slides in at the screen edge (no focus stolen, safe while gaming).
+    // With quiet mode off, the chat panel opens too (also without taking focus).
+    if (!panelVisible() && !settings.get().quiet) showPanel({ focus: false });
+    syncNotify();
+  });
+}
+
+// ---------------------------------------------------------------- helper Opias on screen
+const HELPER_SIZE = 150;
+
+/** A smaller, tinted Opia pops out of the main one and shows what its helper is doing. */
+function createHelperPet(h, k) {
+  if (!petWin || petWin.isDestroyed()) return;
+  const pb = petWin.getBounds();
+  const win = new BrowserWindow({
+    width: HELPER_SIZE, height: HELPER_SIZE,
+    x: Math.round(pb.x + (pb.width - HELPER_SIZE) / 2), y: Math.round(pb.y + pb.height - HELPER_SIZE),
+    transparent: true, frame: false, resizable: false, hasShadow: false, skipTaskbar: true, alwaysOnTop: true,
+    focusable: false, fullscreenable: false, backgroundColor: '#00000000', title: `Opia #${h.index}`, show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false },
+  });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (_) {}
+  win.loadFile(path.join(RENDERER, 'index.html'), { query: { helper: String(h.index), name: h.name } });
+  const phys = createPhysics({ getWindow: () => win, getWorkArea: (b) => workAreaFor(b), onEvent: (ev) => { if (!win.isDestroyed()) win.webContents.send('agent:event', ev); } });
+  helperWins.set(h.index, { win, physics: phys });
+  win.once('ready-to-show', () => {
+    win.showInactive();
+    // Pop out of the main Opia: fling up and to the left, fanning out.
+    setTimeout(() => phys.fling(-420 - 260 * k, -1100 - 120 * (k % 2)), 120 * k);
+  });
+  win.on('closed', () => { const w = helperWins.get(h.index); if (w && w.win === win) helperWins.delete(h.index); });
+}
+
+function closeHelperPet(index, delay = 0) {
+  const w = helperWins.get(index);
+  if (!w) return;
+  setTimeout(() => {
+    try { w.physics.stop('gone'); } catch (_) {}
+    try { if (w.win && !w.win.isDestroyed()) w.win.close(); } catch (_) {}
+    helperWins.delete(index);
+  }, delay);
+}
+
 /** Stop now: drop queued prompts, deny pending approvals, kill the running task. */
 function stopTask() {
   const dropped = queue.length;
@@ -441,6 +517,7 @@ function stopTask() {
   broadcast({ type: 'queue', length: 0 });
   for (const [id, p] of pendingPerms) { p.resolve({ allow: false, message: 'Cancelled by user' }); pendingPerms.delete(id); }
   syncNotify();
+  if (team) team.cancelAll();
   if (agent) agent.cancel();
   rebuildTrayMenu();
   return { ok: true, dropped };
@@ -483,8 +560,8 @@ function enqueuePrompt(text) {
 // ---------------------------------------------------------------- IPC
 
 function registerIpc() {
-  ipcMain.on('pet:moveBy', (_e, dx, dy) => {
-    if (!petWin || (physics && physics.active)) return; // flying: physics owns the window
+  ipcMain.on('pet:moveBy', (e, dx, dy) => {
+    if (!petWin || e.sender !== petWin.webContents || (physics && physics.active)) return; // only the main Opia walks; flying: physics owns it
     const b = petWin.getBounds();
     const wa = workAreaFor(b);
     // Allow the pet to peek a little past the left/right edges, never off the bottom.
@@ -493,11 +570,12 @@ function registerIpc() {
     petWin.setBounds({ x: Math.round(x), y: Math.round(y), width: PET_SIZE, height: PET_SIZE });
     if (panelVisible() && dragFollow) positionPanel();
   });
-  ipcMain.handle('pet:getBounds', () => (petWin ? petWin.getBounds() : { x: 0, y: 0, width: PET_SIZE, height: PET_SIZE }));
-  ipcMain.handle('pet:getWorkArea', () => workAreaFor(petWin ? petWin.getBounds() : null));
+  const senderWin = (e) => { try { return BrowserWindow.fromWebContents(e.sender) || petWin; } catch (_) { return petWin; } };
+  ipcMain.handle('pet:getBounds', (e) => { const w = senderWin(e); return w && !w.isDestroyed() ? w.getBounds() : { x: 0, y: 0, width: PET_SIZE, height: PET_SIZE }; });
+  ipcMain.handle('pet:getWorkArea', (e) => { const w = senderWin(e); return workAreaFor(w && !w.isDestroyed() ? w.getBounds() : null); });
   ipcMain.handle('pet:getCursor', () => screen.getCursorScreenPoint());
-  ipcMain.on('pet:fling', (_e, vx, vy) => { if (physics) physics.fling(vx, vy); });
-  ipcMain.on('pet:grab', () => { if (physics) physics.stop('grabbed'); });
+  ipcMain.on('pet:fling', (e, vx, vy) => { if (physics && petWin && e.sender === petWin.webContents) physics.fling(vx, vy); });
+  ipcMain.on('pet:grab', (e) => { if (physics && petWin && e.sender === petWin.webContents) physics.stop('grabbed'); });
   ipcMain.on('pet:setIgnoreMouse', (_e, ignore) => {
     if (petWin) petWin.setIgnoreMouseEvents(!!ignore, { forward: true });
   });
@@ -691,6 +769,7 @@ app.on('window-all-closed', (e) => { if (!quitting) e.preventDefault(); });
 app.on('before-quit', () => {
   quitting = true;
   if (physics) physics.stop('quit');
+  try { if (team) team.cancelAll(); } catch (_) {}
   try { if (chats) chats.flush(); } catch (_) {}
   try { if (link) link.stop(); } catch (_) {}
   for (const p of pendingPerms.values()) p.resolve({ allow: false, message: 'Opia is quitting' });

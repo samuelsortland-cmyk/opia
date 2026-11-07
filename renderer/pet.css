@@ -119,3 +119,6 @@ body.dragging #prompt-btn { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   #prompt-btn { animation: none; }
 }
+
+/* helper Opias: no prompt button */
+body.helper #prompt-btn { display: none !important; }

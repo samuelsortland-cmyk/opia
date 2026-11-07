@@ -7,6 +7,17 @@
   const promptBtn = document.getElementById('prompt-btn');
   const bubbleEl = document.getElementById('bubble');
 
+  // Helper Opias (#2, #3, ...) use this same page in a smaller window: tinted, no prompt
+  // button, no wandering or dragging; they just show what their helper is doing.
+  const params = new URLSearchParams(location.search);
+  const HELPER = Number(params.get('helper')) || 0;
+  const HELPER_NAME = params.get('name') || '';
+  const HELPER_HUE = { 2: 150, 3: 245, 4: 300, 5: 85, 6: 40 };
+  if (HELPER) {
+    document.body.classList.add('helper');
+    canvas.style.filter = `hue-rotate(${HELPER_HUE[HELPER] || 180}deg) saturate(1.15)`;
+  }
+
   // ------------------------------------------------------------ engine
   let pet;
   try {
@@ -119,6 +130,7 @@
   let flying = false; // being flung around by the physics in the main process
   let snoozed = false;
   function applyWander() {
+    if (HELPER) { if (typeof pet.setWanderPaused === 'function') pet.setWanderPaused(true); return; }
     if (typeof pet.setWanderPaused === 'function') pet.setWanderPaused(panelOpen || snoozed || flying);
   }
 
@@ -142,6 +154,7 @@
   const FLING_WINDOW_MS = 90;
 
   canvas.addEventListener('mousedown', (e) => {
+    if (HELPER) return; // helpers can't be dragged or flung
     if (e.button !== 0) return;
     if (flying && typeof bridge.grab === 'function') bridge.grab(); // catch Opia mid-air
     down = { sx: e.screenX, sy: e.screenY, lastX: e.screenX, lastY: e.screenY, dragging: false };
@@ -229,9 +242,14 @@
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 
   canvas.addEventListener('dblclick', () => bridge.togglePanel());
+  if (HELPER) {
+    applyWander();
+    setTimeout(() => say(`Opia #${HELPER} reporting in! ${HELPER_NAME ? '(' + HELPER_NAME + ')' : ''}`.trim(), 2600), 700);
+  }
   // Right-click Opia: a small menu (open, stop, snooze, hide, turn off).
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    if (HELPER) return;
     if (typeof bridge.petMenu === 'function') bridge.petMenu(); else bridge.togglePanel();
   });
 
@@ -280,7 +298,7 @@
   }
 
   // ------------------------------------------------------------ greeting
-  setTimeout(async () => {
+  if (!HELPER) setTimeout(async () => {
     say('Opia 5.5 at your service! ✦ Click the star to give me a task.', 4500);
     try {
       const status = await bridge.checkClaude();
