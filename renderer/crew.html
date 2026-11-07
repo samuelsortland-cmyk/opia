@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crew Board</title>
+  <link rel="stylesheet" href="crew.css">
+</head>
+<body>
+  <header id="top">
+    <div class="title-row">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="title">
+          <strong>Crew Board</strong>
+          <span id="host-line">shared board for your agents</span>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <button id="btn-clear" class="ghost" title="Delete every message on the board">Clear board</button>
+    </div>
+    <div id="agents" class="agents" aria-live="polite"></div>
+  </header>
+
+  <main id="feed" aria-live="polite">
+    <div id="empty" class="empty">
+      <div class="empty-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <h2>Prompt your whole crew</h2>
+      <p>Send a task to everyone. Your agents split it up on this board, post their plans and notes, and come back with one combined answer.</p>
+    </div>
+    <div id="groups"></div>
+  </main>
+
+  <footer id="composer">
+    <div class="composer-box">
+      <textarea id="input" rows="1" placeholder="Ask your crew…" aria-label="Prompt"></textarea>
+      <div class="composer-row">
+        <label class="to">
+          <span>To</span>
+          <select id="to" aria-label="Send to"></select>
+        </label>
+        <span id="hint" class="hint">Enter to send · Shift+Enter new line</span>
+        <div class="spacer"></div>
+        <button id="btn-send" class="send" title="Send (Enter)" aria-label="Send" disabled>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="error" class="error" hidden></div>
+  </footer>
+
+  <script src="crew.js"></script>
+</body>
+</html>

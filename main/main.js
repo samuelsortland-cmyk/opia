@@ -5,7 +5,7 @@
 const path = require('path');
 const {
   app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage,
-  globalShortcut, Notification, shell, desktopCapturer, systemPreferences, clipboard,
+  globalShortcut, Notification, shell, desktopCapturer, systemPreferences, clipboard, nativeTheme,
 } = require('electron');
 const { spawn } = require('child_process');
 const { LinkServer } = require('./link');
@@ -15,6 +15,8 @@ const { Team } = require('./team');
 const { Settings } = require('./settings');
 const { createPhysics } = require('./physics');
 const { createUpdater } = require('./updater');
+const { createCrew } = require('./crew');
+const { CrewHost } = require('./crew-host');
 
 const PET_SIZE = 200;
 const PANEL_W = 440;
@@ -51,6 +53,10 @@ let chats = null; // chat history
 let team = null;  // helper Opias for long tasks
 const helperWins = new Map(); // helper index -> { win, physics }
 let updater = null;
+let crew = null;     // the Crew Board (shared folder ~/.agent-crew): Opia + Amir + other agent apps
+let crewHost = null; // Opia's side of it: presence, prompt intake, crew tools
+let crewWin = null;  // the Crew Board window
+const CREW_STRENGTHS = 'Works inside your own Edge/Chrome tabs (Opia Link) — web research, reading and filling pages';
 
 const queue = [];               // prompts waiting while the agent is busy
 const pendingPerms = new Map(); // id -> { resolve, toolName, input, summary, expiresAt }
@@ -227,6 +233,73 @@ function positionPanel() {
   panelWin.setPosition(Math.round(x), Math.round(y));
 }
 
+// ---------------------------------------------------------------- Crew Board window
+// One prompt box for every agent app on this PC (renderer/crew.html, shared with Amir).
+
+function showCrew() {
+  if (!crew) return;
+  if (crewWin && !crewWin.isDestroyed()) {
+    if (crewWin.isMinimized()) crewWin.restore();
+    crewWin.show();
+    crewWin.focus();
+    return;
+  }
+  crewWin = new BrowserWindow({
+    width: 460,
+    height: 640,
+    minWidth: 340,
+    minHeight: 420,
+    show: false,
+    frame: true,
+    autoHideMenuBar: true,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#1f1f1d' : '#faf9f5',
+    title: 'Crew Board',
+    webPreferences: {
+      preload: path.join(__dirname, 'crew-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  try { crewWin.setMenu(null); } catch (_) {}
+  crewWin.loadFile(path.join(RENDERER, 'crew.html'));
+  crewWin.once('ready-to-show', () => { if (crewWin && !crewWin.isDestroyed()) { crewWin.show(); crewWin.focus(); } });
+  crewWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  crewWin.webContents.on('will-navigate', (e) => e.preventDefault());
+  if (crewHost) crewHost.viewerOpened();
+  crewWin.on('closed', () => { crewWin = null; if (crewHost) crewHost.viewerClosed(); });
+}
+
+function sendToCrewWin(payload) {
+  if (crewWin && !crewWin.isDestroyed()) crewWin.webContents.send('crew:update', payload);
+}
+
+function startCrew() {
+  try {
+    crew = createCrew({ id: 'opia', name: 'Opia', app: `Opia ${app.getVersion()}`, strengths: CREW_STRENGTHS });
+  } catch (err) {
+    console.error('[opia] Crew Board unavailable:', err.message);
+    return;
+  }
+  crewHost = new CrewHost({
+    crew,
+    name: 'Opia',
+    strengths: CREW_STRENGTHS,
+    stateFile: path.join(app.getPath('userData'), 'opia-crew-state.json'),
+    isEnabled: () => settings.get().crewEnabled !== false,
+    enqueue: (item) => {
+      const r = enqueuePrompt(item.text, { display: item.display, crewPromptId: item.crewPromptId });
+      if (!r.ok) throw new Error(r.error || 'could not queue the prompt');
+      sendToPet({ type: 'status', mood: 'listening', text: 'A crew task from the board! 🎩' });
+    },
+  });
+  crewHost.on('update', sendToCrewWin);
+  crewHost.start();
+}
+
 // focus=false shows the panel without taking keyboard focus from whatever the user is doing
 // (a game, a document...). Only explicit user actions (prompt button, shortcut, tray) focus it.
 // ---------------------------------------------------------------- permission sidebar
@@ -353,6 +426,7 @@ function rebuildTrayMenu() {
     { type: 'separator' },
     { label: petShown ? 'Hide Opia' : 'Show Opia', click: togglePet },
     { label: 'Open prompt  (Ctrl/Cmd+Shift+O)', click: showPanel },
+    { label: 'Crew Board', click: showCrew, enabled: !!crew },
     {
       label: 'Snooze wandering', type: 'checkbox', checked: wanderSnoozed,
       click: (item) => { wanderSnoozed = item.checked; broadcast({ type: 'wander', paused: wanderSnoozed }); },
@@ -393,6 +467,7 @@ function loadAgent() {
     captureScreen,
     getLinkEndpoint: () => (link ? link.cdpEndpoint() : null),
     onTeam: (req) => (team ? team.handle(req) : { error: 'Helpers are not available.' }),
+    onCrew: (req) => (crewHost ? crewHost.tool(req.action, req.args) : { error: 'The Crew Board is not available.' }),
     onPermissionRequest: (req) => requestPermission(req),
   });
 
@@ -429,6 +504,7 @@ function loadAgent() {
   if (chats) agent.sessionId = (chats.current() || {}).sessionId || null; // resume the open chat
   agent.on('event', (ev) => {
     broadcast(ev);
+    if (crewHost) crewHost.agentEvent(ev);
     if (chats) {
       chats.record(ev);
       if (ev.type === 'done' || ev.type === 'error') { chats.setSession(agent.sessionId); broadcast({ type: 'chats' }); }
@@ -513,7 +589,8 @@ function closeHelperPet(index, delay = 0) {
 /** Stop now: drop queued prompts, deny pending approvals, kill the running task. */
 function stopTask() {
   const dropped = queue.length;
-  queue.length = 0;
+  const droppedItems = queue.splice(0);
+  for (const it of droppedItems) if (it.crewPromptId && crewHost) crewHost.runEnded(it.crewPromptId, { stopped: true });
   broadcast({ type: 'queue', length: 0 });
   for (const [id, p] of pendingPerms) { p.resolve({ allow: false, message: 'Cancelled by user' }); pendingPerms.delete(id); }
   syncNotify();
@@ -525,20 +602,27 @@ function stopTask() {
 
 async function runNext() {
   if (!agent || agent.busy || queue.length === 0) return;
-  const text = queue.shift();
+  const item = queue.shift();
   broadcast({ type: 'queue', length: queue.length });
   rebuildTrayMenu();
+  const crewId = item.crewPromptId && crewHost ? item.crewPromptId : null;
+  if (crewId) crewHost.runStarted(crewId);
+  let r = null;
+  let error = '';
   try {
-    await agent.run(text);
+    r = await agent.run(item.text);
   } catch (err) {
-    broadcast({ type: 'error', message: err && err.message ? err.message : String(err) });
+    error = err && err.message ? err.message : String(err);
+    broadcast({ type: 'error', message: error });
   }
+  if (crewId) crewHost.runEnded(crewId, { ok: !!(r && r.ok), result: (r && r.result) || '', stopped: !!(r && r.stopped), error });
   rebuildTrayMenu();
   // Let the agent settle its busy flag before starting the next one.
   setTimeout(runNext, 50);
 }
 
-function enqueuePrompt(text) {
+/** Queue a prompt. opts.display: what the chat shows instead (crew prompts carry a long preamble); opts.crewPromptId: a Crew Board prompt. */
+function enqueuePrompt(text, opts = {}) {
   text = String(text || '').trim();
   if (!text) return { ok: false, error: 'empty prompt' };
   if (!agent) {
@@ -546,8 +630,8 @@ function enqueuePrompt(text) {
     broadcast({ type: 'error', message });
     return { ok: false, error: message };
   }
-  queue.push(text);
-  if (chats) { chats.addUser(text); broadcast({ type: 'chats' }); }
+  queue.push({ text, crewPromptId: opts.crewPromptId || null });
+  if (chats) { chats.addUser(opts.display || text); broadcast({ type: 'chats' }); }
   const queued = agent.busy;
   if (queued) {
     broadcast({ type: 'queue', length: queue.length });
@@ -581,12 +665,21 @@ function registerIpc() {
   });
 
   ipcMain.on('panel:toggle', togglePanel);
+  // ---------- Crew Board ----------
+  ipcMain.on('crew:open', () => showCrew());
+  const needCrew = () => { if (!crew) throw new Error('The Crew Board is not available.'); return crew; };
+  ipcMain.handle('crew:list', () => needCrew().list({ limit: 300 }));
+  ipcMain.handle('crew:agents', () => needCrew().agents());
+  ipcMain.handle('crew:send', (_e, text, to) => needCrew().postAs('user', { to: String(to || 'all'), kind: 'prompt', text: String(text || '') }));
+  ipcMain.handle('crew:clear', () => { needCrew().clear(); });
+  ipcMain.handle('crew:self', () => ({ id: 'opia', name: 'Opia' }));
   ipcMain.on('panel:hide', hidePanel);
   ipcMain.on('app:quit', () => turnOff());
   ipcMain.on('pet:menu', () => {
     if (!petWin || petWin.isDestroyed()) return;
     Menu.buildFromTemplate([
       { label: 'Open Opia', click: () => showPanel() },
+      { label: 'Crew Board', click: () => showCrew(), enabled: !!crew },
       { label: 'Stop current task', click: () => stopTask(), enabled: !!(agent && agent.busy) },
       {
         label: 'Snooze wandering', type: 'checkbox', checked: wanderSnoozed,
@@ -656,6 +749,7 @@ function registerIpc() {
   ipcMain.handle('settings:set', (_e, partial) => {
     const r = settings.set(partial);
     if (partial && typeof partial.openAtLogin === 'boolean') { shortcuts.setOpenAtLogin(app, partial.openAtLogin); rebuildTrayMenu(); }
+    if (partial && typeof partial.crewEnabled === 'boolean' && crewHost) crewHost.sync();
     return r;
   });
   ipcMain.handle('claude:check', async () => {
@@ -707,6 +801,7 @@ app.whenReady().then(() => {
   chats = new ChatStore(app.getPath('userData'));
   registerIpc();
   loadAgent();
+  startCrew();
   // Easy ways to open Opia: shortcuts on first run (refreshed if Opia moved), optional log-in start.
   if (process.platform === 'win32' && !process.env.OPIA_SNAPSHOT_DIR) {
     const first = !settings.get().shortcutsMade;
@@ -770,6 +865,7 @@ app.on('before-quit', () => {
   quitting = true;
   if (physics) physics.stop('quit');
   try { if (team) team.cancelAll(); } catch (_) {}
+  try { if (crewHost) crewHost.stop(); } catch (_) {}
   try { if (chats) chats.flush(); } catch (_) {}
   try { if (link) link.stop(); } catch (_) {}
   for (const p of pendingPerms.values()) p.resolve({ allow: false, message: 'Opia is quitting' });
@@ -787,6 +883,7 @@ if (process.env.OPIA_SNAPSHOT_DIR) {
     fs.mkdirSync(dir, { recursive: true });
     try {
       showPanel();
+      if (process.env.OPIA_SNAPSHOT_CREW) showCrew();
       broadcast({ type: 'status', mood: 'browsing', text: 'Peering at a web page…' });
       broadcast({ type: 'assistant', text: 'Looking at **Hacker News** now — top story is about `pixel art`.' });
       broadcast({ type: 'tool', name: 'mcp__playwright__browser_navigate', summary: 'Opening news.ycombinator.com' });
@@ -797,7 +894,7 @@ if (process.env.OPIA_SNAPSHOT_DIR) {
         fs.writeFileSync(require('path').join(dir, 'screen.jpg'), Buffer.from(shot.data, 'base64'));
         console.log('[opia] screen capture', shot.width + 'x' + shot.height, 'cursor', JSON.stringify(shot.cursor));
       }
-      for (const [name, w] of [['pet', petWin], ['panel', panelWin]]) {
+      for (const [name, w] of [['pet', petWin], ['panel', panelWin], ['crew', crewWin]]) {
         if (!w) continue;
         const img = await w.webContents.capturePage();
         fs.writeFileSync(require('path').join(dir, name + '.png'), img.toPNG());

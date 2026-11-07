@@ -10,7 +10,7 @@
 // server (inside agent.js) and return its decision as the text JSON Claude Code expects:
 //   {"behavior":"allow","updatedInput":{...}}  or  {"behavior":"deny","message":"..."}
 //
-// Env: OPIA_PERM_URL (e.g. http://127.0.0.1:12345/approve), OPIA_SCREEN_URL, OPIA_PERM_TOKEN.
+// Env: OPIA_PERM_URL (e.g. http://127.0.0.1:12345/approve), OPIA_SCREEN_URL, OPIA_TEAM_URL, OPIA_CREW_URL, OPIA_PERM_TOKEN.
 // Protocol: JSON-RPC 2.0, one message per line on stdin/stdout. Logs go to stderr only.
 
 const URL_ = process.env.OPIA_PERM_URL;
@@ -71,6 +71,53 @@ async function teamCall(name, args) {
     return { content: [{ type: 'text', text: e.message }], isError: true };
   }
 }
+// Crew Board tools (docs/CREW.md): only the main Opia gets them, and only while the Crew Board is on
+// (agent.js sets OPIA_CREW_URL then). Same names and arguments as Amir's crew tools.
+const CREW_URL = process.env.OPIA_CREW_URL;
+const CREW_TOOLS = [
+  {
+    name: 'crew_read',
+    description: 'Read the Crew Board: the shared message board of the user\'s AI agent apps on this PC (Opia, Amir, ...). ' +
+      'Returns the transcript for the current crew prompt (or the given prompt id).',
+    inputSchema: { type: 'object', properties: { promptId: { type: 'string', description: 'A prompt id (default: the current crew prompt).' } } },
+  },
+  {
+    name: 'crew_post',
+    description: 'Post a message on the Crew Board for the current crew prompt: a plan (which part you take), a note (a key finding), ' +
+      'a question to another agent, or a result (your outcome; to "user" for the final combined answer).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The message, short and concrete.' },
+        to: { type: 'string', description: 'Who it is for: "all" (default), "user", or an agent id like "amir".' },
+        kind: { type: 'string', enum: ['plan', 'note', 'question', 'result'], description: 'Message kind (default "note").' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'crew_wait',
+    description: 'Wait for new Crew Board messages from the other agents on the current crew prompt (returns as soon as any arrive). ' +
+      'Use it to see the others\' plans, answers and results.',
+    inputSchema: { type: 'object', properties: { seconds: { type: 'number', description: 'How long to wait at most, 1-300 (default 30).' } } },
+  },
+  {
+    name: 'crew_agents',
+    description: 'Who is on the Crew Board: each agent app, whether it is online, what it is doing, and its strengths.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+];
+function crewTools() { return CREW_URL ? CREW_TOOLS : []; }
+async function crewCall(name, args) {
+  try {
+    const r = await postJson(CREW_URL, { action: name.replace(/^crew_/, ''), args: args || {} });
+    if (!r || r.error) return { content: [{ type: 'text', text: (r && r.error) || 'The crew tool failed.' }], isError: true };
+    return { content: [{ type: 'text', text: String(r.text || '') }] };
+  } catch (e) {
+    return { content: [{ type: 'text', text: e.message }], isError: true };
+  }
+}
+
 const TOKEN = process.env.OPIA_PERM_TOKEN || '';
 const http = require('http');
 
@@ -202,11 +249,14 @@ async function handle(msg) {
     case 'ping':
       return isRequest && send({ jsonrpc: '2.0', id, result: {} });
     case 'tools/list':
-      return send({ jsonrpc: '2.0', id, result: { tools: [TOOL, SCREEN_TOOL, ...teamTools()] } });
+      return send({ jsonrpc: '2.0', id, result: { tools: [TOOL, SCREEN_TOOL, ...teamTools(), ...crewTools()] } });
     case 'tools/call': {
       const name = params && params.name;
       if (teamTools().some((t) => t.name === name)) {
         return send({ jsonrpc: '2.0', id, result: await teamCall(name, (params && params.arguments) || {}) });
+      }
+      if (crewTools().some((t) => t.name === name)) {
+        return send({ jsonrpc: '2.0', id, result: await crewCall(name, (params && params.arguments) || {}) });
       }
       if (name === 'see_screen') {
         return send({ jsonrpc: '2.0', id, result: await seeScreen((params && params.arguments) || {}) });
