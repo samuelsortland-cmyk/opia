@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<!-- Visual harness for the Crew Board panel (renderer/crew.*) with a fake window.crewApi and demo data.
+     Serve the repo root over http (same origin is needed for the iframe), e.g.
+       npx http-server -p 8123 .   or   python3 -m http.server 8123
+     then open http://localhost:8123/tools/crew-preview.html  (add ?empty for the empty state). -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Crew Board preview</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #888; }
+    body { display: grid; place-items: center; }
+    iframe { width: 460px; height: 640px; border: 0; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.35); background: #fff; }
+  </style>
+</head>
+<body>
+  <script>
+    (() => {
+      const empty = location.search.includes('empty');
+      const now = Date.now();
+      let n = 0;
+      const mk = (ago, from, to, kind, promptId, text) => {
+        const ts = now - ago * 1000;
+        const id = `${String(ts).padStart(13, '0')}-${from}-${(++n).toString(16).padStart(6, '0')}`;
+        return { id, ts, from, to, kind, promptId: promptId === 'self' ? id : promptId, text };
+      };
+      const msgs = [];
+      if (!empty) {
+        const p1 = mk(1800, 'user', 'all', 'prompt', 'self', 'What is on my calendar tomorrow? Put it in a note on my desktop.');
+        msgs.push(p1,
+          mk(1790, 'amir', 'all', 'plan', p1.id, 'I take the desktop note. Opia, can you read the calendar in Edge?'),
+          mk(1785, 'opia', 'all', 'plan', p1.id, 'On it: I will read Outlook Calendar in your Edge tab and post the events here.'),
+          mk(1700, 'opia', 'all', 'result', p1.id, '3 events tomorrow:\n• 09:00 Stand-up\n• 12:30 Lunch with Kari\n• 15:00 Dentist'),
+          mk(1680, 'amir', 'user', 'result', p1.id, 'Done. Your note "Tomorrow.txt" is on the desktop with the 3 events Opia found.'));
+        const p2 = mk(120, 'user', 'all', 'prompt', 'self', 'Find three good laptop deals under 10 000 kr and compare battery life.');
+        msgs.push(p2,
+          mk(110, 'amir', 'all', 'plan', p2.id, 'I will check the spec sheets and battery tests; Opia takes the shops.'),
+          mk(100, 'opia', 'all', 'plan', p2.id, 'Taking Komplett, Elkjøp and Power: prices and stock.'),
+          mk(60, 'opia', 'amir', 'question', p2.id, 'Do you want only 14" models, or also 15.6"?'),
+          mk(40, 'amir', 'all', 'note', p2.id, 'Both sizes are fine. Notebookcheck has battery runtimes for all three Lenovo models.'),
+          mk(20, 'helper', 'all', 'status', p2.id, 'joined the crew'));
+      }
+      const agents = empty ? [] : [
+        { id: 'opia', name: 'Opia', app: 'Opia 5.11.0', beat: now, state: 'working', doing: 'browsing Elkjøp.no', strengths: 'browser tabs, web research', promptId: msgs[6] && msgs[6].promptId, online: true },
+        { id: 'amir', name: 'Amir', app: 'Amir 1.4.0', beat: now, state: 'working', doing: 'reading spec sheets', strengths: 'PC desktop, files, shell', promptId: msgs[6] && msgs[6].promptId, online: true },
+        { id: 'helper', name: 'Scout', app: 'Scout 0.1', beat: now - 600000, state: 'offline', doing: '', strengths: '', promptId: null, online: false },
+      ];
+      let cb = () => {};
+      window.crewApi = {
+        list: async () => msgs.slice(),
+        agents: async () => agents.slice(),
+        self: async () => ({ id: 'opia', name: 'Opia' }),
+        send: async (text, to) => {
+          const m = mk(0, 'user', to, 'prompt', 'self', text);
+          msgs.push(m);
+          setTimeout(() => cb({ messages: [mk(0, 'amir', 'all', 'plan', m.id, 'Got it, planning…')] }), 800);
+          return m;
+        },
+        clear: async () => { msgs.length = 0; },
+        onUpdate: (f) => { cb = f; },
+      };
+    })();
+  </script>
+  <iframe src="../renderer/crew.html" title="Crew Board"></iframe>
+</body>
+</html>
