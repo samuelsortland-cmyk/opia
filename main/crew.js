@@ -284,7 +284,7 @@ function createCrew({ id, name, app, strengths, dir } = {}) {
    * promptId: only that thread. since: id; messages after it count as new even if they already exist.
    * from: id or id[] to accept (default: anyone but me).
    */
-  function wait({ promptId = null, since = null, timeoutMs = 60000, from = null } = {}) {
+  function wait({ promptId = null, since = null, timeoutMs = 60000, from = null, signal = null } = {}) {
     const pid = cleanRef(promptId);
     const froms = from == null ? null : new Set([].concat(from).map(cleanId));
     const match = (m) => (froms ? froms.has(m.from) : m.from !== selfId) && (!pid || m.promptId === pid || m.id === pid);
@@ -297,8 +297,14 @@ function createCrew({ id, name, app, strengths, dir } = {}) {
         done = true;
         clearTimeout(timer);
         unsub();
+        if (signal) signal.removeEventListener('abort', onAbort);
         resolve(msgs);
       };
+      const onAbort = () => finish([]);
+      if (signal) {
+        if (signal.aborted) return finish([]);
+        signal.addEventListener('abort', onAbort);
+      }
       unsub = watch((fresh) => {
         const hits = fresh.filter(match).filter((m) => !since || m.id > since);
         if (hits.length) finish(hits);
