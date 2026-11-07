@@ -24,6 +24,7 @@ const DEFAULTS = Object.freeze({
   updateToken: '', // optional read-only GitHub token, needed only if the repo is private
   helpersEnabled: true, // let Opia call in helper Opias for long tasks (uses more of your Claude plan)
   maxHelpers: 3, // at most this many helpers at once (1-5)
+  crewEnabled: true, // join the Crew Board (~/.agent-crew): take prompts from it and coordinate with Amir and other agent apps
   openAtLogin: false, // start Opia when you log in
   shortcutsMade: false, // internal: Desktop/Start menu shortcuts were created once
   settingsVersion: 3,
@@ -80,6 +81,7 @@ function sanitize(obj) {
   if (typeof obj.quiet === 'boolean') out.quiet = obj.quiet;
   if (typeof obj.openAtLogin === 'boolean') out.openAtLogin = obj.openAtLogin;
   if (typeof obj.helpersEnabled === 'boolean') out.helpersEnabled = obj.helpersEnabled;
+  if (typeof obj.crewEnabled === 'boolean') out.crewEnabled = obj.crewEnabled;
   if (obj.maxHelpers != null && Number.isFinite(Number(obj.maxHelpers))) out.maxHelpers = Math.max(1, Math.min(5, Math.round(Number(obj.maxHelpers))));
   if (typeof obj.shortcutsMade === 'boolean') out.shortcutsMade = obj.shortcutsMade;
   if (typeof obj.screenAccess === 'boolean') out.screenAccess = obj.screenAccess;

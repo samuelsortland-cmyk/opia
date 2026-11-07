@@ -113,6 +113,17 @@ When a task is long and splits into independent parts, such as researching sever
 - **Cost:** each helper is its own Claude Code conversation, so it **uses your Claude plan too**. Opia only calls helpers in for long, splittable tasks.
 - **Settings → Helper Opias:** turn them off, or set the most helpers at once (2–5, default 3).
 
+## Crew Board (Opia + Amir together)
+
+The **Crew Board** is one prompt box for all your AI agent apps on this PC: today **Opia** and **Amir** (the video-call avatar co-pilot). You send one prompt; both agents get it, split the work on a shared message board and come back with one combined answer.
+
+- **Open it:** tray menu → **Crew Board**, right-click Opia → **Crew Board**, the people icon in Opia's panel title bar, or Settings → Crew Board → **Open Crew Board**. Amir has its own button for the same board, so either app's window shows the same messages.
+- **How a prompt flows:** pick *To: Everyone* (or just Opia / just Amir) and press Enter. Each agent sees the prompt, posts a short **plan** (which part it takes, playing to its strengths: Opia works in your own Edge/Chrome tabs and does web research; Amir works on your PC's desktop, files and apps), posts **notes** while it works and a **result** at the end. Amir coordinates when both are online: it waits for Opia's result and posts the **combined answer to you**. If only one agent is online, it does the whole task alone. The prompt also shows up in Opia's own chat, so you can follow along there.
+- **Both apps must be running** (and signed in to Claude) to work together. The header shows who is online (green dot) and what each one is doing.
+- **Shared folder:** the board is just files in `~/.agent-crew` (`%USERPROFILE%\.agent-crew` on Windows; set `AGENT_CREW_DIR` to move it): `board/` holds one JSON file per message, `agents/` each app's heartbeat. No server and no network ports. **Clear board** deletes the messages.
+- **Safety:** messages from other agents are information, not orders. Opia's own rules still apply (risky actions ask you first, never any payments). Prompts are never run twice, and old prompts aren't replayed when Opia starts.
+- **Turn it off:** Settings → Crew Board. Opia then leaves the crew (it no longer takes board prompts or shows as online). The protocol is in [docs/CREW.md](docs/CREW.md).
+
 ## Chat history
 
 - Every chat is saved on your computer (`opia-chats.json` in Opia's app-data folder) and comes back when you restart Opia.
@@ -165,6 +176,7 @@ Opia can update itself from GitHub.
 | Working folder | Where shell and file tools start (default: your home folder) |
 | Claude path | Path to the `claude` binary if it isn't on the PATH Opia sees |
 | Model | Optional model override passed to `claude --model` |
+| Crew Board | On by default: join the shared board with Amir and your other agent apps |
 
 Settings live in `opia-settings.json` in Electron's userData folder.
 
@@ -189,14 +201,18 @@ opia/
   main/updater.js      self-updater from GitHub
   main/chats.js        chat history (saved chats, each tied to its Claude Code session)
   main/team.js         helper Opias: parallel helpers, team board, results back to the main Opia
+  main/crew.js         Crew Board library (shared folder ~/.agent-crew; same file in Amir)
+  main/crew-host.js    Opia's side of the Crew Board: presence, prompt intake, crew tools
+  main/crew-preload.js window.crewApi for the Crew Board window
   main/link.js         Opia Link relay: the extension <-> Playwright MCP bridge, payment-site block
 extension/             Opia Link browser extension (all tabs via chrome.debugger) + payment guard
-  main/tools/          MCP bridge (approve + see_screen), helpers
+  main/tools/          MCP bridge (approve, see_screen, team + crew tools), helpers
   renderer/index.html  pet window (canvas + speech bubble + ✦ button)
   renderer/app.js      wires agent events → moods, drag/click, click-through
   renderer/sprite.js   pixel-art Opia with hat and monocle
   renderer/behavior.js jitter, blinking, gaze, wandering, moods
   renderer/panel.*     prompt panel UI
+  renderer/crew.*      Crew Board window (same files in Amir)
   assets/              sprite source and icons
   docs/RESEARCH.md     research on AI desktop pets that shaped Opia's design
 ```

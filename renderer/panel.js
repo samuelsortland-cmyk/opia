@@ -387,6 +387,10 @@
   function openDrawer() { drawer.hidden = false; scrim.hidden = false; settingsEl.hidden = true; refreshChatList(); }
   function closeDrawer() { drawer.hidden = true; scrim.hidden = true; }
   $('btn-chats').addEventListener('click', () => (drawer.hidden ? openDrawer() : closeDrawer()));
+  // Crew Board: one prompt box for Opia, Amir and the user's other agent apps (its own window).
+  const openCrew = () => { if (typeof opia.openCrew === 'function') opia.openCrew(); };
+  $('btn-crew').addEventListener('click', openCrew);
+  $('btn-crew-open').addEventListener('click', openCrew);
   $('btn-drawer-close').addEventListener('click', closeDrawer);
   scrim.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) { e.stopPropagation(); closeDrawer(); } }, true);
@@ -489,7 +493,7 @@
 
   // ------------------------------------------------------------ settings
 
-  const FIELDS = ['helpersEnabled', 'maxHelpers', 'openAtLogin', 'permissionMode', 'browserMode', 'extensionToken', 'browserProfile', 'screenAccess', 'quiet', 'autoUpdateCheck', 'updateRepo', 'updateBranch', 'updatePath', 'updateToken', 'browserHeadless', 'browser', 'browserPath', 'cwd', 'claudePath', 'model'];
+  const FIELDS = ['helpersEnabled', 'maxHelpers', 'crewEnabled', 'openAtLogin', 'permissionMode', 'browserMode', 'extensionToken', 'browserProfile', 'screenAccess', 'quiet', 'autoUpdateCheck', 'updateRepo', 'updateBranch', 'updatePath', 'updateToken', 'browserHeadless', 'browser', 'browserPath', 'cwd', 'claudePath', 'model'];
 
   async function loadSettings() {
     const s = await opia.getSettings();

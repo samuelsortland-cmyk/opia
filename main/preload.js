@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('opia', {
   hidePanel: () => ipcRenderer.send('panel:hide'),
   turnOff: () => ipcRenderer.send('app:quit'),
   petMenu: () => ipcRenderer.send('pet:menu'),
+  openCrew: () => ipcRenderer.send('crew:open'),
   // permission sidebar
   onNotify: (cb) => {
     const handler = (_e, list) => cb(list);
